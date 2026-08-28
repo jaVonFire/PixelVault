@@ -1,0 +1,25 @@
+<!-- ============================================================
+  COMPONENTE: NAVBAR (copia de referencia)
+  Se usa identico en TODAS las paginas, cambiando unicamente que
+  boton lleva la clase "active" segun la pagina.
+  Pegar justo despues de <div class="scanlines"></div>
+============================================================ -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="showSection('home')">
+      <div class="nav-logo-icon"><i class="fas fa-gamepad"></i></div>
+      <span class="nav-logo-text">PIXELVAULT</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn active" onclick="showSection('home')" id="nav-home"><i class="fas fa-home"></i> <span>Inicio</span></button>
+      <button class="nav-btn" onclick="showSection('products')" id="nav-products"><i class="fas fa-store"></i> <span>Productos</span></button>
+      <button class="nav-btn" onclick="showSection('auth')" id="nav-auth"><i class="fas fa-user"></i> <span>Mi Cuenta</span></button>
+      <button class="nav-btn" onclick="showSection('about')" id="nav-about"><i class="fas fa-circle-info"></i> <span>Acerca</span></button>
+      <button class="nav-btn admin-btn" onclick="showSection('admin')" id="nav-admin"><i class="fas fa-shield-halved"></i> <span>Admin</span></button>
+    </div>
+    <div class="nav-right">
+      <select class="currency-select" id="currencySelect" title="Moneda de visualizacion" onchange="onCurrencyChange(this.value)"></select>
+      <div id="navUserArea"></div>
+    </div>
+  </div>
+</nav>

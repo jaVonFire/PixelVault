@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelVault — Gaming Merch Store</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="home">
+
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- NAVEGACION -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="showSection('home')">
+      <div class="nav-logo-icon"><i class="fas fa-gamepad"></i></div>
+      <span class="nav-logo-text">PIXELVAULT</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn active" onclick="showSection('home')" id="nav-home"><i class="fas fa-home"></i> <span data-i18n="nav_home">Inicio</span></button>
+      <button class="nav-btn" onclick="showSection('products')" id="nav-products"><i class="fas fa-store"></i> <span data-i18n="nav_products">Productos</span></button>
+      <button class="nav-btn" onclick="showSection('auth')" id="nav-auth"><i class="fas fa-user"></i> <span data-i18n="nav_account">Mi Cuenta</span></button>
+      <button class="nav-btn" onclick="showSection('about')" id="nav-about"><i class="fas fa-circle-info"></i> <span data-i18n="nav_about">Acerca</span></button>
+      <button class="nav-btn admin-btn" onclick="showSection('admin')" id="nav-admin"><i class="fas fa-shield-halved"></i> <span data-i18n="nav_admin">Admin</span></button>
+    </div>
+    <div class="nav-right">
+      <select class="currency-select" id="langSelect" title="Idioma / Language" onchange="setLang(this.value)">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+      </select>
+      <select class="currency-select" id="currencySelect" title="Moneda de visualizacion" onchange="onCurrencyChange(this.value)"></select>
+      <div id="navUserArea"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- HOME -->
+<section class="section active" id="sec-home">
+  <div class="hero">
+    <div class="hero-badge" data-i18n="hero_badge">NIVEL MAXIMO — TIENDA #1 DE GAMING</div>
+    <h1><span data-i18n="hero_title_1">TU ARSENAL</span> <span class="blue" data-i18n="hero_title_gamer">GAMER</span> <span data-i18n="hero_title_2">EN UN</span> <span class="red" data-i18n="hero_title_solo">SOLO LUGAR</span></h1>
+    <p class="hero-sub" data-i18n="hero_sub">Accesorios, merchandising, coleccionables y todo lo que necesitas para completar tu setup. Crea tu cuenta, arma tu carrito y sube de nivel con cada compra.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="showSection('products')"><span data-i18n="hero_catalog">VER CATALOGO</span></button>
+      <button class="btn-green" onclick="goToRegister()"><span data-i18n="hero_register">CREAR CUENTA</span></button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-num" id="stat-products">0</div><div class="stat-label" data-i18n="stat_products">Productos</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-clients">&mdash;</div><div class="stat-label" data-i18n="stat_clients">Clientes</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-rating">&mdash;</div><div class="stat-label" data-i18n="stat_rating">Rating</div></div>
+    </div>
+  </div>
+  <div class="featured">
+    <h2 class="section-title" data-i18n="featured">DESTACADOS</h2>
+    <p class="section-sub" data-i18n="featured_sub">Los mas buscados por la comunidad gamer</p>
+    <div class="products-grid" id="featured-grid"></div>
+  </div>
+  <div class="privacy-section">
+    <h2 class="section-title" data-i18n="privacy_title">TU INFORMACION ESTA SEGURA</h2>
+    <p class="section-sub" data-i18n="privacy_sub">Clasificamos tus datos segun su nivel de privacidad</p>
+    <div class="privacy-grid">
+      <div class="privacy-card public"><div class="privacy-icon" style="color:#10B981;"><i class="fas fa-globe"></i></div><h4 data-i18n="privacy_public_t">PUBLICOS</h4><p data-i18n="privacy_public_d">Nombre de usuario, avatar, juegos favoritos. Visibles para toda la comunidad.</p></div>
+      <div class="privacy-card semi"><div class="privacy-icon" style="color:var(--blue-g);"><i class="fas fa-users"></i></div><h4 data-i18n="privacy_semi_t">SEMI-PRIVADOS</h4><p data-i18n="privacy_semi_d">Email, pais, rango de edad, plataforma, documento de identidad. Compartidos solo con partners autorizados.</p></div>
+      <div class="privacy-card private"><div class="privacy-icon" style="color:#F59E0B;"><i class="fas fa-lock"></i></div><h4 data-i18n="privacy_private_t">PRIVADOS</h4><p data-i18n="privacy_private_d">Telefono, direccion, historial de compras. Solo uso interno de la empresa.</p></div>
+      <div class="privacy-card sensitive"><div class="privacy-icon" style="color:var(--red-g);"><i class="fas fa-user-shield"></i></div><h4 data-i18n="privacy_sensitive_t">SENSIBLES</h4><p data-i18n="privacy_sensitive_d">Datos de pago. Encriptados y con maxima proteccion.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CARRITO FLOTANTE -->
+<button class="cart-toggle" id="cartToggle" aria-label="Abrir carrito">
+  <i class="fas fa-cart-shopping"></i>
+  <span class="cart-badge" id="cartBadge" style="display:none;">0</span>
+</button>
+<div class="cart-window" id="cartWindow">
+  <div class="cart-header">
+    <h4><i class="fas fa-cart-shopping"></i> <span data-i18n="cart_title">MI CARRITO</span> <span class="items-count" id="cartCountLbl"></span></h4>
+    <button class="chat-close" id="cartClose"><i class="fas fa-xmark"></i></button>
+  </div>
+  <div class="cart-body" id="cartBody"></div>
+  <div class="cart-footer" id="cartFooter"></div>
+</div>
+
+<!-- CHATBOT -->
+<button class="chat-toggle" id="chatToggle" aria-label="Abrir chat">
+  <i class="fas fa-headset"></i>
+  <div class="badge" id="chatBadge" style="display:none;">1</div>
+</button>
+<div class="chat-window" id="chatWindow" role="dialog">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+      <div class="chat-header-info"><h4>VAULT-BOT</h4><p><i class="fas fa-circle" style="font-size:7px;color:#10B981;margin-right:4px;"></i><span data-i18n="chat_online">En linea</span></p></div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-rate-btn" id="chatRateBtn" title="Calificar atencion"><i class="fas fa-star"></i></button>
+      <button class="chat-close" id="chatClose"><i class="fas fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="rating-area" id="ratingArea"></div>
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+    <button class="chat-send" id="chatSend"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-brand">PIXELVAULT</div>
+  <p data-i18n="footer_slogan">Tu tienda de gaming de confianza — Todos los derechos reservados 2024</p>
+  <p style="margin-top:4px;font-size:10px;color:var(--border);" data-i18n="footer_rates">Tasas de cambio referenciales para demostracion</p>
+</footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/toast.js"></script>
+<script src="assets/js/i18n.js"></script>
+<script src="assets/js/storage.js"></script>
+<script src="assets/js/currency.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/navigation.js"></script>
+<script src="assets/js/products.js"></script>
+<script src="assets/js/cart.js"></script>
+<script src="assets/js/profile.js"></script>
+<script src="assets/js/chat.js"></script>
+<script src="assets/js/admin.js"></script>
+<script src="assets/js/background.js"></script>
+<script src="assets/js/main.js"></script>
+</body>
+</html>

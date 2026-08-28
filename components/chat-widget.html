@@ -1,0 +1,26 @@
+<!-- ============================================================
+  COMPONENTE: CHATBOT (copia de referencia)
+  Identico en todas las paginas.
+============================================================ -->
+<button class="chat-toggle" id="chatToggle" aria-label="Abrir chat">
+  <i class="fas fa-headset"></i>
+  <div class="badge" id="chatBadge" style="display:none;">1</div>
+</button>
+<div class="chat-window" id="chatWindow" role="dialog">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+      <div class="chat-header-info"><h4>VAULT-BOT</h4><p><i class="fas fa-circle" style="font-size:7px;color:#10B981;margin-right:4px;"></i>En linea</p></div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-rate-btn" id="chatRateBtn" title="Calificar atencion"><i class="fas fa-star"></i></button>
+      <button class="chat-close" id="chatClose"><i class="fas fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="rating-area" id="ratingArea"></div>
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+    <button class="chat-send" id="chatSend"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>

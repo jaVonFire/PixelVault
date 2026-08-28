@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelVault — Mi Cuenta</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="auth">
+
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- NAVEGACION -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="showSection('home')">
+      <div class="nav-logo-icon"><i class="fas fa-gamepad"></i></div>
+      <span class="nav-logo-text">PIXELVAULT</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn" onclick="showSection('home')" id="nav-home"><i class="fas fa-home"></i> <span data-i18n="nav_home">Inicio</span></button>
+      <button class="nav-btn" onclick="showSection('products')" id="nav-products"><i class="fas fa-store"></i> <span data-i18n="nav_products">Productos</span></button>
+      <button class="nav-btn active" onclick="showSection('auth')" id="nav-auth"><i class="fas fa-user"></i> <span data-i18n="nav_account">Mi Cuenta</span></button>
+      <button class="nav-btn" onclick="showSection('about')" id="nav-about"><i class="fas fa-circle-info"></i> <span data-i18n="nav_about">Acerca</span></button>
+      <button class="nav-btn admin-btn" onclick="showSection('admin')" id="nav-admin"><i class="fas fa-shield-halved"></i> <span data-i18n="nav_admin">Admin</span></button>
+    </div>
+    <div class="nav-right">
+      <select class="currency-select" id="langSelect" title="Idioma / Language" onchange="setLang(this.value)">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+      </select>
+      <select class="currency-select" id="currencySelect" title="Moneda de visualizacion" onchange="onCurrencyChange(this.value)"></select>
+      <div id="navUserArea"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- MI CUENTA -->
+<section class="section active" id="sec-auth">
+  <div class="auth-wrap">
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" id="tabbtn-login" onclick="showAuthTab('login')"><i class="fas fa-right-to-bracket"></i> <span data-i18n="auth_tab_login">INICIAR SESION</span></button>
+      <button class="auth-tab-btn" id="tabbtn-register" onclick="showAuthTab('register')"><i class="fas fa-user-plus"></i> <span data-i18n="auth_tab_register">CREAR CUENTA</span></button>
+    </div>
+
+    <div class="auth-panel active" id="auth-login">
+      <div class="auth-box">
+        <h3 class="auth-title"><i class="fas fa-right-to-bracket" style="color:var(--green);"></i> <span data-i18n="auth_login_title">BIENVENIDO DE VUELTA</span></h3>
+        <p class="auth-sub" data-i18n="auth_login_sub">Ingresa con tu usuario o email para comprar, ver tu perfil y tus pedidos.</p>
+        <div class="auth-error" id="login-error"></div>
+        <form onsubmit="handleLogin(event)">
+          <div class="form-group"><label data-i18n="auth_username_email">Usuario o Email</label><input type="text" class="form-input" id="login-user" placeholder="GamerTag2024 o tu@email.com" autocomplete="username" required></div>
+          <div class="form-group">
+            <label data-i18n="auth_password">Contrasena</label>
+            <div class="pass-wrap">
+              <input type="password" class="form-input" id="login-pass" placeholder="••••••••" autocomplete="current-password" required>
+              <button type="button" class="pass-toggle" onclick="togglePass('login-pass',this)" tabindex="-1" aria-label="Mostrar contrasena"><i class="fas fa-eye"></i></button>
+            </div>
+          </div>
+          <button type="submit" class="btn-green" style="width:100%;" id="login-btn"><span data-i18n="auth_login_btn">INGRESAR</span></button>
+        </form>
+      </div>
+    </div>
+
+    <div class="auth-panel" id="auth-register">
+      <div class="auth-box" style="padding:22px;">
+        <h3 class="auth-title"><i class="fas fa-user-plus" style="color:var(--blue-g);"></i> <span data-i18n="auth_register_title">NUEVO JUGADOR</span></h3>
+        <p class="auth-sub" data-i18n="auth_register_sub">Crea tu cuenta con contrasena. Cada campo indica el nivel de privacidad de tu dato.</p>
+        <div class="auth-error" id="reg-error"></div>
+        <form onsubmit="handleRegister(event)">
+          <div class="form-group"><label data-i18n="auth_username"><span class="tag pub">PUBLIC</span></label><input type="text" class="form-input" id="reg-username" data-i18n-placeholder="auth_username" placeholder="GamerTag2024" required></div>
+          <div class="form-group"><label data-i18n="auth_displayname"><span class="tag pub">PUBLIC</span></label><input type="text" class="form-input" id="reg-displayname" data-i18n-placeholder="auth_displayname" placeholder="Tu nombre visible"></div>
+          <div class="form-group"><label data-i18n="auth_favgame"><span class="tag pub">PUBLIC</span></label><input type="text" class="form-input" id="reg-favgame" data-i18n-placeholder="auth_favgame" placeholder="Ej: Elden Ring, Zelda, Fortnite..."></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="auth_password"><span class="tag pri">PRIV</span></label>
+              <div class="pass-wrap">
+                <input type="password" class="form-input" id="reg-pass" autocomplete="new-password" oninput="onPassStrength(this.value)" required>
+                <button type="button" class="pass-toggle" onclick="togglePass('reg-pass',this)" tabindex="-1" aria-label="Mostrar contrasena"><i class="fas fa-eye"></i></button>
+              </div>
+              <div class="strength"><div class="strength-bar" id="strength-bar"></div><span class="strength-txt" id="strength-txt"></span></div>
+              <div class="pass-hint" data-i18n="auth_pass_hint">Min. 8 caracteres, 1 mayuscula, 1 minuscula y 1 numero.</div>
+            </div>
+            <div class="form-group">
+              <label data-i18n="auth_pass2"><span class="tag pri">PRIV</span></label>
+              <div class="pass-wrap">
+                <input type="password" class="form-input" id="reg-pass2" autocomplete="new-password" oninput="onPassMatch()" required>
+                <button type="button" class="pass-toggle" onclick="togglePass('reg-pass2',this)" tabindex="-1" aria-label="Mostrar contrasena"><i class="fas fa-eye"></i></button>
+              </div>
+              <div class="pass-hint invalid" id="reg-pass-match"></div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group"><label data-i18n="auth_email"><span class="tag sem">SEMI</span></label><input type="email" class="form-input" id="reg-email" placeholder="tu@email.com" required></div>
+            <div class="form-group"><label data-i18n="auth_country"><span class="tag sem">SEMI</span></label>
+              <select class="form-input" id="reg-country">
+                <option value="" data-i18n="sel_country">Seleccionar...</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label data-i18n="auth_age"><span class="tag sem">SEMI</span></label>
+              <select class="form-input" id="reg-age"><option value="" data-i18n="sel_country">Seleccionar...</option><option>13-17</option><option>18-24</option><option>25-34</option><option>35-44</option><option>45+</option></select>
+            </div>
+            <div class="form-group"><label data-i18n="auth_platform"><span class="tag sem">SEMI</span></label>
+              <select class="form-input" id="reg-platform"><option value="" data-i18n="sel_country">Seleccionar...</option><option>PC</option><option>PlayStation</option><option>Xbox</option><option>Nintendo Switch</option><option>Mobile</option></select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group"><label data-i18n="auth_phone"><span class="tag pri">PRIV</span></label><input type="tel" class="form-input" id="reg-phone" data-i18n-placeholder="auth_phone" placeholder="+XX XXX XXXXXXX"></div>
+            <div class="form-group"><label data-i18n="auth_address"><span class="tag pri">PRIV</span></label><input type="text" class="form-input" id="reg-address" data-i18n-placeholder="auth_address" placeholder="Calle, Ciudad, CP"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group"><label data-i18n="auth_payment"><span class="tag sen">SENS</span></label>
+              <select class="form-input" id="reg-payment"><option value="" data-i18n="sel_country">Seleccionar...</option><option>Visa</option><option>Mastercard</option><option>PayPal</option><option>Transferencia</option></select>
+            </div>
+          </div>
+
+          <div style="margin-top:14px;">
+            <label class="form-check"><input type="checkbox" id="reg-terms" required> <span data-i18n="auth_terms">Acepto los terminos y el tratamiento de mis datos segun la clasificacion indicada.</span></label>
+          </div>
+          <button type="submit" class="btn-primary" style="width:100%;margin-top:14px;" id="reg-btn"><span data-i18n="auth_register_btn">REGISTRAR Y ENTRAR</span></button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CARRITO FLOTANTE -->
+<button class="cart-toggle" id="cartToggle" aria-label="Abrir carrito">
+  <i class="fas fa-cart-shopping"></i>
+  <span class="cart-badge" id="cartBadge" style="display:none;">0</span>
+</button>
+<div class="cart-window" id="cartWindow">
+  <div class="cart-header">
+    <h4><i class="fas fa-cart-shopping"></i> <span data-i18n="cart_title">MI CARRITO</span> <span class="items-count" id="cartCountLbl"></span></h4>
+    <button class="chat-close" id="cartClose"><i class="fas fa-xmark"></i></button>
+  </div>
+  <div class="cart-body" id="cartBody"></div>
+  <div class="cart-footer" id="cartFooter"></div>
+</div>
+
+<!-- CHATBOT -->
+<button class="chat-toggle" id="chatToggle" aria-label="Abrir chat">
+  <i class="fas fa-headset"></i>
+  <div class="badge" id="chatBadge" style="display:none;">1</div>
+</button>
+<div class="chat-window" id="chatWindow" role="dialog">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+      <div class="chat-header-info"><h4>VAULT-BOT</h4><p><i class="fas fa-circle" style="font-size:7px;color:#10B981;margin-right:4px;"></i><span data-i18n="chat_online">En linea</span></p></div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-rate-btn" id="chatRateBtn" title="Calificar atencion"><i class="fas fa-star"></i></button>
+      <button class="chat-close" id="chatClose"><i class="fas fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="rating-area" id="ratingArea"></div>
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+    <button class="chat-send" id="chatSend"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-brand">PIXELVAULT</div>
+  <p data-i18n="footer_slogan">Tu tienda de gaming de confianza — Todos los derechos reservados 2024</p>
+  <p style="margin-top:4px;font-size:10px;color:var(--border);" data-i18n="footer_rates">Tasas de cambio referenciales para demostracion</p>
+</footer>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/toast.js"></script>
+<script src="../assets/js/i18n.js"></script>
+<script src="../assets/js/storage.js"></script>
+<script src="../assets/js/currency.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/navigation.js"></script>
+<script src="../assets/js/products.js"></script>
+<script src="../assets/js/cart.js"></script>
+<script src="../assets/js/profile.js"></script>
+<script src="../assets/js/chat.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script src="../assets/js/background.js"></script>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

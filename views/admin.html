@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelVault — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="admin">
+
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- NAVEGACION -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="showSection('home')">
+      <div class="nav-logo-icon"><i class="fas fa-gamepad"></i></div>
+      <span class="nav-logo-text">PIXELVAULT</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn" onclick="showSection('home')" id="nav-home"><i class="fas fa-home"></i> <span data-i18n="nav_home">Inicio</span></button>
+      <button class="nav-btn" onclick="showSection('products')" id="nav-products"><i class="fas fa-store"></i> <span data-i18n="nav_products">Productos</span></button>
+      <button class="nav-btn" onclick="showSection('auth')" id="nav-auth"><i class="fas fa-user"></i> <span data-i18n="nav_account">Mi Cuenta</span></button>
+      <button class="nav-btn" onclick="showSection('about')" id="nav-about"><i class="fas fa-circle-info"></i> <span data-i18n="nav_about">Acerca</span></button>
+      <button class="nav-btn admin-btn active" onclick="showSection('admin')" id="nav-admin"><i class="fas fa-shield-halved"></i> <span data-i18n="nav_admin">Admin</span></button>
+    </div>
+    <div class="nav-right">
+      <select class="currency-select" id="langSelect" title="Idioma / Language" onchange="setLang(this.value)">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+      </select>
+      <select class="currency-select" id="currencySelect" title="Moneda de visualizacion" onchange="onCurrencyChange(this.value)"></select>
+      <div id="navUserArea"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- ADMIN -->
+<section class="section active" id="sec-admin">
+  <div id="admin-login-panel" class="admin-login">
+    <div style="font-size:48px;color:var(--red);margin-bottom:20px;"><i class="fas fa-shield-halved"></i></div>
+    <h2 data-i18n="admin_access">ACCESO ADMINISTRADOR</h2>
+    <p style="font-size:13px;color:var(--txt-d);margin-bottom:24px;" data-i18n="admin_denied">Solo usuarios con rol Administrador pueden acceder a este panel. Inicia sesion con una cuenta de administrador.</p>
+    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="showSection('auth')" data-i18n="auth_login_btn">INGRESAR</button>
+  </div>
+
+  <div id="admin-dashboard" class="admin-dashboard" style="display:none;padding-top:20px;">
+    <div class="dash-header">
+      <h2 style="display:flex;align-items:center;gap:10px;"><i class="fas fa-terminal"></i> <span data-i18n="admin_panel">PANEL DE ADMINISTRACION</span></h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="dash-date" id="dash-date"></span>
+        <button class="btn-secondary" onclick="logout()" style="font-size:9px;padding:8px 16px;" data-i18n="admin_logout">CERRAR SESION</button>
+      </div>
+    </div>
+
+    <div class="admin-tabs">
+      <button class="admin-tab-btn active" data-tab="overview"><i class="fas fa-chart-line"></i> <span data-i18n="admin_overview">RESUMEN</span></button>
+      <button class="admin-tab-btn" data-tab="products"><i class="fas fa-box"></i> <span data-i18n="admin_products">PRODUCTOS</span></button>
+      <button class="admin-tab-btn" data-tab="orders"><i class="fas fa-cart-shopping"></i> <span data-i18n="admin_orders">PEDIDOS</span></button>
+    </div>
+
+    <div class="admin-tab-content active" id="tab-overview">
+      <div class="dash-cards" id="dash-cards"></div>
+
+      <div class="report-section">
+        <h3><i class="fas fa-triangle-exclamation"></i> <span data-i18n="admin_low_stock">Inventario bajo</span></h3>
+        <div id="dash-low-stock"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p data-i18n="loading">Cargando...</p></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" class="admin-2col">
+        <div class="report-section">
+          <h3><i class="fas fa-clock-rotate-left"></i> <span data-i18n="admin_last_orders">Ultimos pedidos</span></h3>
+          <div id="dash-last-orders"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p data-i18n="loading">Cargando...</p></div></div>
+        </div>
+        <div class="report-section">
+          <h3><i class="fas fa-chart-pie"></i> <span data-i18n="admin_order_status">Estado de pedidos</span></h3>
+          <div id="dash-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-tab-content" id="tab-products">
+      <div id="admin-products"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p data-i18n="loading">Cargando...</p></div></div>
+    </div>
+
+    <div class="admin-tab-content" id="tab-orders">
+      <div id="admin-orders"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p data-i18n="loading">Cargando...</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CARRITO FLOTANTE -->
+<button class="cart-toggle" id="cartToggle" aria-label="Abrir carrito">
+  <i class="fas fa-cart-shopping"></i>
+  <span class="cart-badge" id="cartBadge" style="display:none;">0</span>
+</button>
+<div class="cart-window" id="cartWindow">
+  <div class="cart-header">
+    <h4><i class="fas fa-cart-shopping"></i> <span data-i18n="cart_title">MI CARRITO</span> <span class="items-count" id="cartCountLbl"></span></h4>
+    <button class="chat-close" id="cartClose"><i class="fas fa-xmark"></i></button>
+  </div>
+  <div class="cart-body" id="cartBody"></div>
+  <div class="cart-footer" id="cartFooter"></div>
+</div>
+
+<!-- CHATBOT -->
+<button class="chat-toggle" id="chatToggle" aria-label="Abrir chat">
+  <i class="fas fa-headset"></i>
+  <div class="badge" id="chatBadge" style="display:none;">1</div>
+</button>
+<div class="chat-window" id="chatWindow" role="dialog">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+      <div class="chat-header-info"><h4>VAULT-BOT</h4><p><i class="fas fa-circle" style="font-size:7px;color:#10B981;margin-right:4px;"></i><span data-i18n="chat_online">En linea</span></p></div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-rate-btn" id="chatRateBtn" title="Calificar atencion"><i class="fas fa-star"></i></button>
+      <button class="chat-close" id="chatClose"><i class="fas fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="rating-area" id="ratingArea"></div>
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+    <button class="chat-send" id="chatSend"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-brand">PIXELVAULT</div>
+  <p data-i18n="footer_slogan">Tu tienda de gaming de confianza — Todos los derechos reservados 2024</p>
+  <p style="margin-top:4px;font-size:10px;color:var(--border);" data-i18n="footer_rates">Tasas de cambio referenciales para demostracion</p>
+</footer>
+
+<style>
+  @media(max-width:900px){ .admin-2col{grid-template-columns:1fr !important;} }
+</style>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/toast.js"></script>
+<script src="../assets/js/i18n.js"></script>
+<script src="../assets/js/storage.js"></script>
+<script src="../assets/js/currency.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/navigation.js"></script>
+<script src="../assets/js/products.js"></script>
+<script src="../assets/js/cart.js"></script>
+<script src="../assets/js/profile.js"></script>
+<script src="../assets/js/chat.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script src="../assets/js/background.js"></script>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

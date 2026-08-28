@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelVault — Acerca de</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="about">
+
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- NAVEGACION -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="showSection('home')">
+      <div class="nav-logo-icon"><i class="fas fa-gamepad"></i></div>
+      <span class="nav-logo-text">PIXELVAULT</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn" onclick="showSection('home')" id="nav-home"><i class="fas fa-home"></i> <span data-i18n="nav_home">Inicio</span></button>
+      <button class="nav-btn" onclick="showSection('products')" id="nav-products"><i class="fas fa-store"></i> <span data-i18n="nav_products">Productos</span></button>
+      <button class="nav-btn" onclick="showSection('auth')" id="nav-auth"><i class="fas fa-user"></i> <span data-i18n="nav_account">Mi Cuenta</span></button>
+      <button class="nav-btn active" onclick="showSection('about')" id="nav-about"><i class="fas fa-circle-info"></i> <span data-i18n="nav_about">Acerca</span></button>
+      <button class="nav-btn admin-btn" onclick="showSection('admin')" id="nav-admin"><i class="fas fa-shield-halved"></i> <span data-i18n="nav_admin">Admin</span></button>
+    </div>
+    <div class="nav-right">
+      <select class="currency-select" id="langSelect" title="Idioma / Language" onchange="setLang(this.value)">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+      </select>
+      <select class="currency-select" id="currencySelect" title="Moneda de visualizacion" onchange="onCurrencyChange(this.value)"></select>
+      <div id="navUserArea"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- ACERCA DE -->
+<section class="section active" id="sec-about">
+  <div class="about-wrap">
+    <div class="about-hero">
+      <h2><span data-i18n="about_about">SOBRE</span> <span>PIXELVAULT</span></h2>
+      <p data-i18n="about_intro">Somos una tienda 100% digital dedicada a comercializar productos oficiales de videojuegos: ediciones coleccionistas, accesorios, merchandising y coleccionables. Nacimos de la pasion gamer y la nostalgia retro, con un compromiso firme: proteger los datos de nuestros clientes como se protege un loot legendario.</p>
+    </div>
+
+    <h2 class="section-title" style="font-size:16px;" data-i18n="about_company">LA EMPRESA</h2>
+    <p class="section-sub" data-i18n="about_company_sub">Conoce quienes somos</p>
+    <div class="about-grid">
+      <div class="about-card"><i class="fas fa-flag"></i><h4 data-i18n="about_mission">MISION</h4><p data-i18n="about_mission_d">Llevar productos oficiales de videojuegos a toda Latinoamerica con precios justos, envios rapidos y una experiencia de compra que se sienta como subir de nivel.</p></div>
+      <div class="about-card"><i class="fas fa-eye" style="color:var(--blue-g);"></i><h4 data-i18n="about_vision">VISION</h4><p data-i18n="about_vision_d">Ser la tienda de gaming #1 de Latinoamerica para 2030, reconocida por su catalogo, su comunidad y su transparencia en el manejo de datos personales.</p></div>
+      <div class="about-card"><i class="fas fa-heart"></i><h4 data-i18n="about_values">VALORES</h4><p data-i18n="about_values_d">Autenticidad (solo productos originales), comunidad (gamers atendiendo gamers), proteccion de datos y nostalgia retro en cada detalle.</p></div>
+    </div>
+
+    <div class="about-grid">
+      <div class="about-card" style="grid-column:1/-1;">
+        <h4><i class="fas fa-users" style="color:var(--red-l);font-size:16px;margin-right:8px;"></i><span data-i18n="about_founders">FUNDADORES</span></h4>
+        <div class="founder"><div class="founder-avatar">AR</div><div class="founder-info"><b>Alex "PixelMaster" Ramirez</b><span data-i18n="about_f1">CEO y cofundador — Ex campeon nacional de arcade, 15 anos en e-commerce</span></div></div>
+        <div class="founder f2"><div class="founder-avatar">DO</div><div class="founder-info"><b>Dani "VaultQueen" Ortega</b><span data-i18n="about_f2">COO y cofundadora — Coleccionista de figuras, experta en logistica internacional</span></div></div>
+        <p style="margin-top:14px;font-size:12px;color:var(--txt-d);" data-i18n="about_team">Fundada en 2020 en Ciudad de Mexico. Equipo actual: 25 personas entre gamers, coleccionistas y desarrolladores. Almacenes en Mexico, Colombia y Espana.</p>
+      </div>
+    </div>
+
+    <div class="guide-section">
+      <h2 class="section-title" style="font-size:16px;" data-i18n="about_guide">¿COMO FUNCIONA ESTA PAGINA?</h2>
+      <p class="section-sub" data-i18n="about_guide_sub">Guia rapida paso a paso</p>
+      <div class="steps-grid">
+        <div class="step-card"><span class="step-num">01</span><h4 data-i18n="about_s1_t">EXPLORA EL CATALOGO</h4><p data-i18n="about_s1_d">En <b>Productos</b> encontraras 16 items en 4 categorias. Los precios se muestran en la moneda que elijas con el selector superior (pesos, dolares, soles y mas).</p></div>
+        <div class="step-card"><span class="step-num">02</span><h4 data-i18n="about_s2_t">CREA TU CUENTA E INICIA SESION</h4><p data-i18n="about_s2_d">Para comprar necesitas cuenta con contrasena, como en cualquier tienda real. Ve a <b>Mi Cuenta</b>, registra tus datos (clasificados por privacidad) y quedaras logeado automaticamente.</p></div>
+        <div class="step-card"><span class="step-num">03</span><h4 data-i18n="about_s3_t">ARMA TU CARRITO</h4><p data-i18n="about_s3_d">Agrega productos con el boton AGREGAR. Abre tu carrito con el <b>boton azul flotante</b> (arriba del chat), ajusta cantidades, respeta el stock y finaliza la compra.</p></div>
+        <div class="step-card"><span class="step-num">04</span><h4 data-i18n="about_s4_t">TU PERFIL</h4><p data-i18n="about_s4_d">Tu avatar aparece en el menu superior. Desde ahi ves <b>Mi Perfil</b> (tus datos por clasificacion), <b>Mis Pedidos</b> y <b>Ajustes</b> (moneda, datos editables), o cierras sesion.</p></div>
+        <div class="step-card"><span class="step-num">05</span><h4 data-i18n="about_s5_t">HABLA CON VAULT-BOT</h4><p data-i18n="about_s5_d">Nuestro chatbot atiende 24/7 sin limite de mensajes. Al terminar, califica con el <b>boton de estrella</b> en la cabecera del chat (1 a 5 estrellas + comentario).</p></div>
+      </div>
+    </div>
+
+    <div class="contact-box">
+      <h4 style="font-size:11px;color:var(--blue-g);margin-bottom:14px;letter-spacing:2px;" data-i18n="about_contact">CONTACTO</h4>
+      <div class="contact-row"><i class="fas fa-envelope"></i><b data-i18n="about_email">Email:</b> hola@pixelvault.gg</div>
+      <div class="contact-row"><i class="fas fa-phone"></i><b data-i18n="about_phone">Telefono:</b> +52 55 1234 5678</div>
+      <div class="contact-row"><i class="fas fa-location-dot"></i><b data-i18n="about_office">Oficinas:</b> Av. Gamer 123, Col. Pixel, CDMX, Mexico</div>
+    </div>
+  </div>
+</section>
+
+<!-- CARRITO FLOTANTE -->
+<button class="cart-toggle" id="cartToggle" aria-label="Abrir carrito">
+  <i class="fas fa-cart-shopping"></i>
+  <span class="cart-badge" id="cartBadge" style="display:none;">0</span>
+</button>
+<div class="cart-window" id="cartWindow">
+  <div class="cart-header">
+    <h4><i class="fas fa-cart-shopping"></i> <span data-i18n="cart_title">MI CARRITO</span> <span class="items-count" id="cartCountLbl"></span></h4>
+    <button class="chat-close" id="cartClose"><i class="fas fa-xmark"></i></button>
+  </div>
+  <div class="cart-body" id="cartBody"></div>
+  <div class="cart-footer" id="cartFooter"></div>
+</div>
+
+<!-- CHATBOT -->
+<button class="chat-toggle" id="chatToggle" aria-label="Abrir chat">
+  <i class="fas fa-headset"></i>
+  <div class="badge" id="chatBadge" style="display:none;">1</div>
+</button>
+<div class="chat-window" id="chatWindow" role="dialog">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+      <div class="chat-header-info"><h4>VAULT-BOT</h4><p><i class="fas fa-circle" style="font-size:7px;color:#10B981;margin-right:4px;"></i><span data-i18n="chat_online">En linea</span></p></div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-rate-btn" id="chatRateBtn" title="Calificar atencion"><i class="fas fa-star"></i></button>
+      <button class="chat-close" id="chatClose"><i class="fas fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="rating-area" id="ratingArea"></div>
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+    <button class="chat-send" id="chatSend"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-brand">PIXELVAULT</div>
+  <p data-i18n="footer_slogan">Tu tienda de gaming de confianza — Todos los derechos reservados 2024</p>
+  <p style="margin-top:4px;font-size:10px;color:var(--border);" data-i18n="footer_rates">Tasas de cambio referenciales para demostracion</p>
+</footer>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/toast.js"></script>
+<script src="../assets/js/i18n.js"></script>
+<script src="../assets/js/storage.js"></script>
+<script src="../assets/js/currency.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/navigation.js"></script>
+<script src="../assets/js/products.js"></script>
+<script src="../assets/js/cart.js"></script>
+<script src="../assets/js/profile.js"></script>
+<script src="../assets/js/chat.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script src="../assets/js/background.js"></script>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>
