@@ -71,6 +71,13 @@ function productos_create() {
         $estado = 'activo';
     }
 
+    /* Verificar que la categoria exista */
+    $chkCat = db()->prepare('SELECT id FROM categoria WHERE id=?');
+    $chkCat->execute(array($categoria_id));
+    if (!$chkCat->fetch()) {
+        json_error('La categoria seleccionada no existe');
+    }
+
     $stmt = db()->prepare('INSERT INTO producto (nombre, descripcion, categoria_id, precio, imagen, cantidad, stock_minimo, estado)
                            VALUES (?,?,?,?,?,?,?,?)');
     $stmt->execute(array($nombre, $descripcion, $categoria_id, $precio, $imagen, $cantidad, $stock_minimo, $estado));
@@ -97,6 +104,13 @@ function productos_update() {
         json_error('Nombre, categoria y precio son obligatorios');
     }
 
+    /* Verificar que la categoria exista */
+    $chkCat = db()->prepare('SELECT id FROM categoria WHERE id=?');
+    $chkCat->execute(array($categoria_id));
+    if (!$chkCat->fetch()) {
+        json_error('La categoria seleccionada no existe');
+    }
+
     $stmt = db()->prepare('UPDATE producto
                            SET nombre=?, descripcion=?, categoria_id=?, precio=?, imagen=?,
                                cantidad=?, stock_minimo=?, estado=?
@@ -116,31 +130,18 @@ function productos_delete() {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if ($id <= 0) json_error('ID de producto invalido');
 
-    $pdo = db();
+    /* Eliminacion LOGICA: se inactiva el producto para preservar el
+       historial de pedidos (no se borran detalles de pedidos asociados). */
+    $stmt = db()->prepare('UPDATE producto SET estado="inactivo" WHERE id=?');
+    $stmt->execute(array($id));
 
-    /* Verificar que el producto existe */
-    $chk = $pdo->prepare('SELECT id FROM producto WHERE id=?');
-    $chk->execute(array($id));
-    if (!$chk->fetch()) json_error('Producto no encontrado', 404);
-
-    /* Eliminacion FISICA siempre, en transaccion:
-       - primero los detalles de pedido que referencian el producto
-         (para liberar la FK detalle_pedido.producto_id -> producto.id)
-       - luego el producto mismo */
-    $pdo->beginTransaction();
-    try {
-        $delDet = $pdo->prepare('DELETE FROM detalle_pedido WHERE producto_id=?');
-        $delDet->execute(array($id));
-
-        $delProd = $pdo->prepare('DELETE FROM producto WHERE id=?');
-        $delProd->execute(array($id));
-
-        $pdo->commit();
-        json_ok(array('message' => 'Producto eliminado definitivamente de la base de datos'));
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        json_error('No se pudo eliminar el producto', 500);
+    if ($stmt->rowCount() === 0) {
+        /* verificar que el producto exista */
+        $chk = db()->prepare('SELECT id FROM producto WHERE id=?');
+        $chk->execute(array($id));
+        if (!$chk->fetch()) json_error('Producto no encontrado', 404);
     }
+    json_ok(array('message' => 'Producto desactivado (eliminacion logica)'));
 }
 
 /* Productos con inventario bajo (alerta) */

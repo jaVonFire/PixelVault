@@ -47,7 +47,10 @@ function loadMyOrders() {
 
     if (document.getElementById('featured-grid')) renderFeatured();
     if (document.getElementById('stat-products')) updateHomeStats();
-    if (page === 'products') renderProducts(currentFilter);
+    if (page === 'products') {
+      renderProducts(currentFilter);
+      initProductFilters();
+    }
     if (page === 'profile') {
       loadMyOrders().then(function () {
         renderProfile();

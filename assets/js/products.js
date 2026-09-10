@@ -64,6 +64,31 @@ function filterProducts(cat, btn) {
   renderProducts(cat);
 }
 
+/* Construye los filtros de categoria dinamicamente desde la base de datos */
+function initProductFilters() {
+  var bar = document.getElementById('filter-bar');
+  if (!bar) return;
+  apiGet('categorias').then(function (data) {
+    var cats = data.categorias || [];
+    var keyMap = {
+      juegos: 'filter_juegos',
+      accesorios: 'filter_accesorios',
+      merchandising: 'filter_merchandising',
+      coleccionables: 'filter_coleccionables'
+    };
+    var html = '';
+    cats.forEach(function (c) {
+      var active = String(c.id) === String(currentFilter) && currentFilter !== 'all';
+      var key = keyMap[c.nombre] || null;
+      html += '<button class="nav-btn' + (active ? ' active' : '') + '" onclick="filterProducts(' + c.id + ',this)"' +
+        (key ? ' data-i18n="' + key + '"' : '') + '>' + (key ? t(key) : escapeHtml(c.nombre)) + '</button>';
+    });
+    bar.insertAdjacentHTML('beforeend', html);
+  }).catch(function () {
+    bar.insertAdjacentHTML('beforeend', '<span style="font-size:10px;color:var(--txt-d);">' + t('filter_all') + ' + </span>');
+  });
+}
+
 /* Estadisticas del home (desde BD).
    El total de clientes y el rating se muestran solo al
    administrador (requieren permisos); para el resto quedan

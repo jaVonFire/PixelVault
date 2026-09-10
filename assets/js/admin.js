@@ -156,8 +156,16 @@ function showProductForm(id) {
   var isEdit = !!id;
   var prod = isEdit ? allProducts.find(function (x) { return String(x.id) === String(id); }) : null;
   if (isEdit && !prod) {
-    /* puede venir de la lista con todos; buscar de nuevo */
-    var row = null;
+    /* El producto no esta en memoria: recargar catalogo y reintentar */
+    loadProducts(true).then(function () {
+      var reloaded = allProducts.find(function (x) { return String(x.id) === String(id); });
+      if (reloaded) {
+        showProductForm(id);
+      } else {
+        showToast('No se encontro el producto con ID ' + id, 'error');
+        renderAdminProducts();
+      }
+    });
     return;
   }
 
