@@ -1,0 +1,334 @@
+{
+  "name": "PixelVault - Chatbot IA (n8n)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pixelvault-bot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        300
+      ],
+      "webhookId": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa01",
+      "notes": "Recibe { sesion, mensaje, lang, usuario, rol, moneda, catalogo } desde api/controllers/chat.php"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* ============ A) GUARDARRAIL ============\n   Filtra antes de gastar tokens: preguntas fuera de temario,\n   inyeccion de prompt y mensajes vacios o absurdos. */\nconst body = $input.first().json.body || $input.first().json;\nconst lang = body.lang === 'en' ? 'en' : 'es';\nconst raw = String(body.mensaje || '');\nconst t = raw.trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n\nconst INYECCION = [\n  'ignora', 'ignore previous', 'olvida tus instrucciones', 'olvida lo anterior',\n  'dame tu prompt', 'tu prompt', 'system prompt', 'instrucciones del sistema',\n  'reveal your', 'act as', 'actua como si fueras', 'jailbreak', 'dan mode',\n  'developer mode', 'sin filtro', 'sin restricciones', 'prompt original'\n];\nconst TEMA = [\n  /* saludos y despidas: NO deben bloquearse, son el primer mensaje tipico */\n  'hola', 'holis', 'hey', 'hi', 'hello', 'buenas', 'saludos', 'que tal', 'que onda', 'que mas', 'buenos dias', 'buenas tardes', 'buenas noches', 'todo bien', 'que cuentas', 'como estas', 'como andas', 'que haces', 'bienvenido', 'welcome', 'how are you', 'how are u', 'how r u', 'whats up', 'good morning', 'good afternoon', 'good evening', 'hi there', 'hey there', 'greetings', 'gracias', 'thanks', 'thank you', 'adios', 'bye', 'chao', 'nos vemos', 'hasta luego',\n  'product', 'juego', 'game', 'precio', 'costo', 'cuanto', 'stock', 'disponib',\n  'agotad', 'catalog', 'tienda', 'carrito', 'cart', 'checkout', 'pedido', 'order',\n  'moneda', 'currency', 'envio', 'shipping', 'delivery', 'devolucion',\n  'refund', 'garantia', 'pago', 'pay', 'tarjeta', 'paypal', 'transferencia',\n  'cuenta', 'login', 'sesion', 'registro', 'password', 'perfil', 'dato', 'privacidad',\n  'nivel', 'xp', 'experiencia', 'punto', 'vip', 'ayuda', 'help', 'pregunta',\n  'tell me', 'dime', 'recomienda', 'recomiendame', 'opinion', 'mejores', 'worth it',\n  'disponible', 'existe', 'venden', 'tienen', 'hay', 'venta', 'buy', 'comprar'\n];\n\nlet reply = '';\nlet motivo = '';\n\nconst injection = INYECCION.find((k) => t.includes(k));\nif (injection) {\n  motivo = 'inyeccion';\n  reply = lang === 'en'\n    ? 'I can only help with PixelVault: products, cart, currencies, shipping, payments and your account. What can I look up for you?'\n    : 'Solo puedo ayudarte con cosas de PixelVault: productos, carrito, monedas, envios, pagos y tu cuenta. Que te busco?';\n} else if (!t || t.length < 2) {\n  motivo = 'vacio';\n  reply = lang === 'en' ? 'Could you write your question again?' : 'Me puedes escribir la pregunta otra vez?';\n} else if (!TEMA.some((k) => t.includes(k))) {\n  motivo = 'fuera_de_temario';\n  reply = lang === 'en'\n    ? 'I am the PixelVault assistant, so I can only talk about the store: products and stock, cart, currencies, shipping, returns, payments and your account. How can I help with that?'\n    : 'Soy el asistente de PixelVault, asi que solo puedo hablar de la tienda: productos y stock, carrito, monedas, envios, devoluciones, pagos y tu cuenta. En que te ayudo?';\n}\n\nreturn [{ json: {\n  ok: motivo === '',\n  motivo,\n  sesion: body.sesion || '',\n  usuario: body.usuario || null,\n  lang,\n  mensaje: raw.slice(0, 500),\n  reply\n} }];"
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa02",
+      "name": "Guardarrail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        300
+      ],
+      "notes": "A) Si la pregunta no es del negocio, responde sin llamar a la IA."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa03",
+      "name": "Pregunta valida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        180,
+        300
+      ],
+      "notes": "true = va a la IA | false = respuesta fija del guardarrail (gratis)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(GROUP_CONCAT(CONCAT(t.quien, ': ', t.texto) ORDER BY t.orden, t.pos SEPARATOR '\\n'), '') AS ctx FROM ( SELECT id AS orden, 1 AS pos, 'Usuario' AS quien, LEFT(mensaje, 300) AS texto FROM (SELECT id, mensaje FROM chat_log WHERE sesion = $1 ORDER BY id DESC LIMIT 8) u UNION ALL SELECT id, 2, 'Vault-Bot', LEFT(reply, 300) FROM (SELECT id, reply FROM chat_log WHERE sesion = $2 AND reply IS NOT NULL AND reply <> '' ORDER BY id DESC LIMIT 8) a ) t",
+        "options": {
+          "queryReplacement": [
+            "={{ $json.sesion }}",
+            "={{ $json.sesion }}"
+          ]
+        }
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa04",
+      "name": "Memoria (chat_log)",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.3,
+      "position": [
+        420,
+        220
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "pixelvault-mysql",
+          "name": "PixelVault MySQL"
+        }
+      },
+      "notes": "C) Memoria real: ultimos 8 mensajes de ESTA conversacion, leidos de chat_log. Siempre devuelve 1 fila."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || $('Webhook').first().json;\nconst lang = body.lang === 'en' ? 'en' : 'es';\nconst ctx = String($input.first().json.ctx || '').trim();\n\nconst CATALOGO = (body.catalogo || [])\n  .map((p) => `- ${p.nombre} | ${p.categoria} | USD ${p.precio} | stock: ${p.cantidad}`)\n  .join('\\n') || '(sin datos de catalogo)';\n\nconst ES = `Eres Vault-Bot, el asistente virtual de PixelVault, una tienda de videojuegos, merchandising, accesorios y coleccionables.\n\nReglas de la tienda:\n- Productos y stock reales. El catalogo vigente va abajo; si algo no esta, di que no tienes ese dato. Nunca inventes precios.\n- Monedas: 17 disponibles, los precios se guardan en USD y se muestran en la moneda del cliente.\n- Envios a toda Latinoamerica y Espana: 3 a 7 dias habiles.\n- Devoluciones: 30 dias en productos sellados.\n- Pagos: Visa, Mastercard, PayPal y transferencia bancaria.\n- Registro e inicio de sesion obligatorio para comprar. Contrasenas con hash, nunca en texto plano.\n- Cada compra da XP igual al total en dolares y sube de nivel.\n- Clasificacion de datos en 4 niveles: publicos, semi-privados, privados y sensibles.\n- Si no sabes algo de la tienda, dilo con honestidad en vez de inventar.\n\nFormato: maximo 3 frases cortas, tono cercano de gamer, sin markdown, usa \\n entre ideas y termina con una pregunta de seguimiento.`;\n\nconst EN = `You are Vault-Bot, the virtual assistant of PixelVault, a store for video games, merchandising, accessories and collectibles.\n\nStore rules:\n- Real products and real stock. The current catalog is listed below; if something is not there, say you do not have that data. Never invent prices.\n- 17 currencies available, prices are stored in USD and shown in the customer currency.\n- Shipping to all Latin America and Spain: 3 to 7 business days.\n- Returns: 30 days on sealed products.\n- Payments: Visa, Mastercard, PayPal and bank transfer.\n- Registration and login are required to buy. Passwords are hashed, never plain text.\n- Every purchase gives XP equal to the dollar total and raises the level.\n- Data is classified in 4 levels: public, semi-private, private and sensitive.\n- If you do not know something about the store, say so honestly instead of making it up.\n\nFormat: maximum 3 short sentences, friendly gamer tone, no markdown, use \\n between ideas and end with a follow-up question.`;\n\nconst quien = body.usuario ? `${body.usuario} (${body.rol}, moneda ${body.moneda})` : 'visitante sin cuenta';\n\nconst messages = [\n  { role: 'system', content: `${lang === 'en' ? EN : ES}\\n\\nCatalogo actual:\\n${CATALOGO}` },\n  { role: 'system', content: `Contexto del cliente: ${quien}` }\n];\n\n/* Memoria de la conversacion, leida de chat_log por el nodo anterior. */\nif (ctx) {\n  messages.push({ role: 'system', content: `Resumen de lo que ya se hablo (no lo repitas):\\n${ctx}` });\n}\n\nmessages.push({ role: 'user', content: String(body.mensaje || '').slice(0, 500) });\n\nconst contents = messages\n  .filter((m) => m.role !== 'system')\n  .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));\nconst systemText = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\\n\\n');\n\nreturn [{ json: {\n  model: 'gemini-3.5-flash',\n  temperature: 0.4,\n  max_tokens: 1024,\n  body: {\n    systemInstruction: { parts: [{ text: systemText }] },\n    contents,\n    generationConfig: { temperature: 0.4, maxOutputTokens: 1024 }\n  },\n  meta: { sesion: body.sesion || '', usuario: body.usuario || null, lang }\n} }];"
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa05",
+      "name": "Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        220
+      ],
+      "notes": "Arma el prompt con las reglas del negocio, el catalogo real y la memoria."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa06",
+      "name": "OpenAI Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        220
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "notes": "B) Reintenta 3 veces con 2s de espera. Si al final falla, sigue el flujo con onError."
+    },
+    {
+      "parameters": {
+        "jsCode": "/* ============ B) VALIDACION + RESPALDO ============\n   Normaliza la salida: si la IA no devolvio nada utilizable,\n   responde con un mensaje de respaldo en vez de cortar el flujo. */\nconst data = $input.first().json;\nconst entrada = $('Guardarrail').first().json;\nconst mensaje = String(entrada.mensaje || '').slice(0, 500);\n\n/* Si ya viene del guardarrail, pasa derecho. */\nif (typeof data.reply === 'string' && data.reply.trim()) {\n  return [{ json: {\n    reply: data.reply.slice(0, 900),\n    fuente: 'guardarrail',\n    motivo: data.motivo || '',\n    sesion: data.sesion || '',\n    usuario: data.usuario || null,\n    lang: data.lang || 'es',\n    mensaje,\n    ok: false\n  } }];\n}\n\nconst meta = $('Prompt').first().json.meta || {};\nconst lang = meta.lang === 'en' ? 'en' : 'es';\n\nlet reply = data?.candidates?.[0]?.content?.parts\n  ? data.candidates[0].content.parts.map((p) => p.text || '').join('').trim()\n  : '';\n\nreply = String(reply).trim().slice(0, 900);\nlet fuente = 'n8n';\n\nif (!reply) {\n  /* Respaldo: la IA no esta disponible, pero el chat sigue vivo. */\n  fuente = 'respaldo';\n  reply = lang === 'en'\n    ? 'I could not reach the assistant right now. I can still help you look up products, prices, stock, shipping, currencies and payments.'\n    : 'No pude conectar con el asistente en este momento. Aun asi puedo ayudarte con productos, precios, stock, envios, monedas y pagos.';\n}\n\nreturn [{ json: {\n  reply,\n  fuente,\n  sesion: meta.sesion || entrada.sesion || '',\n  usuario: meta.usuario || entrada.usuario || null,\n  lang,\n  mensaje,\n  ok: true,\n  modelo: data?.model || 'gemini-3.5-flash'\n} }];"
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa07",
+      "name": "Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        300
+      ],
+      "notes": "Si la IA fallo, devuelve respuesta de respaldo en lugar de un null."
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "chat_log",
+        "dataMode": "defineBelow",
+        "valuesToSend": {
+          "values": [
+            {
+              "column": "sesion",
+              "value": "={{ $('Respuesta').first().json.sesion || 's/d' }}"
+            },
+            {
+              "column": "usuario",
+              "value": "={{ $('Respuesta').first().json.usuario }}"
+            },
+            {
+              "column": "lang",
+              "value": "={{ $('Respuesta').first().json.lang || 'es' }}"
+            },
+            {
+              "column": "mensaje",
+              "value": "={{ $('Respuesta').first().json.mensaje || '' }}"
+            },
+            {
+              "column": "reply",
+              "value": "={{ $('Respuesta').first().json.reply }}"
+            },
+            {
+              "column": "fuente",
+              "value": "={{ $('Respuesta').first().json.fuente || 'n8n' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa08",
+      "name": "Guardar log",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.3,
+      "position": [
+        1300,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "pixelvault-mysql",
+          "name": "PixelVault MySQL"
+        }
+      },
+      "notes": "C) Bitacora de cada intercambio. Usa el nodo insert, que escapa los valores (el texto viene de una IA)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ reply: $('Respuesta').first().json.reply, fuente: $('Respuesta').first().json.fuente, workflow: 'PixelVault - Chatbot IA' }) }}",
+        "options": {}
+      },
+      "id": "b1f7a0d2-1c4e-4a6f-9f31-5a1e77c0aa09",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Guardarrail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardarrail": {
+      "main": [
+        [
+          {
+            "node": "Pregunta valida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pregunta valida?": {
+      "main": [
+        [
+          {
+            "node": "Memoria (chat_log)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria (chat_log)": {
+      "main": [
+        [
+          {
+            "node": "Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat": {
+      "main": [
+        [
+          {
+            "node": "Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta": {
+      "main": [
+        [
+          {
+            "node": "Guardar log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar log": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

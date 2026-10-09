@@ -1,5 +1,7 @@
 /* ============================================================
    CHATBOT - responde en el idioma activo (ES/EN)
+   Flujo:  chat.js -> api/index.php?action=chat -> n8n -> IA
+   Si n8n no responde, se usa el bot local de palabras clave.
    ============================================================ */
 var chatOpen = false, chatInitialized = false, currentRating = 0;
 var chatToggleBtn = document.getElementById('chatToggle');
@@ -28,13 +30,35 @@ document.getElementById('chatClose').addEventListener('click', function (e) { e.
 document.getElementById('chatSend').addEventListener('click', function (e) { e.stopPropagation(); sendChat(); });
 chatInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } });
 
-function addBotMessage(text) {
+function addBotMessage(text, fuente) {
   var time = new Date().toLocaleTimeString(currentLang() === 'es' ? 'es' : 'en', { hour: '2-digit', minute: '2-digit' });
   var div = document.createElement('div');
   div.className = 'chat-msg bot';
-  div.innerHTML = text + '<span class="time">' + time + '</span>';
+  /* El texto puede venir de un modelo de IA: se sanea antes de insertarlo. */
+  var body = sanitizeRich(text);
+  if (fuente) body += '<span class="src src-' + escapeHtml(fuente === 'local' ? 'local' : fuente) + '">' + chatBadge(fuente) + '</span>';
+  div.innerHTML = body + '<span class="time">' + time + '</span>';
   chatMessagesEl.appendChild(div);
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+/* Etiqueta de origen: deja ver que respondio la IA, el guardarrail
+   o el respaldo de emergencia. */
+function chatBadge(fuente) {
+  var map = {
+    n8n: 'chat_badge_ai',
+    guardarrail: 'chat_badge_guard',
+    respaldo: 'chat_badge_fallback',
+    local: 'chat_badge_local'
+  };
+  return escapeHtml(t(map[fuente] || 'chat_badge_local'));
+}
+/* Escapa el HTML y solo rehabilita etiquetas simples SIN atributos. */
+function sanitizeRich(text) {
+  var allowed = { b: 1, strong: 1, i: 1, em: 1, u: 1, br: 1, p: 1, ul: 1, ol: 1, li: 1 };
+  return escapeHtml(String(text == null ? '' : text)).replace(/&lt;(\/?)([a-z0-9]+)\s*&gt;/gi, function (m, slash, tag) {
+    tag = tag.toLowerCase();
+    return allowed[tag] ? '<' + (slash ? '/' : '') + tag + '>' : m;
+  });
 }
 function addUserMessage(text) {
   var time = new Date().toLocaleTimeString(currentLang() === 'es' ? 'es' : 'en', { hour: '2-digit', minute: '2-digit' });
@@ -199,14 +223,32 @@ function sendChat() {
   if (!text) return;
   addUserMessage(text);
   chatInputEl.value = '';
+  showTyping();
+
+  /* La respuesta la genera n8n (modelo de IA) a traves de la API.
+     Si n8n no esta disponible, el .catch devuelve el bot local. */
+  apiSend('POST', 'chat', { mensaje: text, lang: currentLang() })
+    .then(function (r) {
+      hideTyping();
+      addBotMessage(r.reply, r.fuente);
+    })
+    .catch(function () {
+      hideTyping();
+      addBotMessage(getBotResponse(text), 'local');
+    });
+}
+
+/* ===== INDICADOR DE ESCRITURA (mientras n8n + IA responden) ===== */
+function showTyping() {
+  hideTyping();
   var typing = document.createElement('div');
-  typing.className = 'chat-msg bot'; typing.id = 'typing';
+  typing.className = 'chat-msg bot';
+  typing.id = 'typing';
   typing.innerHTML = '<i class="fas fa-ellipsis fa-beat-fade"></i> ...';
   chatMessagesEl.appendChild(typing);
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-  setTimeout(function () {
-    var el = document.getElementById('typing');
-    if (el) el.remove();
-    addBotMessage(getBotResponse(text));
-  }, 500 + Math.random() * 700);
+}
+function hideTyping() {
+  var el = document.getElementById('typing');
+  if (el) el.remove();
 }

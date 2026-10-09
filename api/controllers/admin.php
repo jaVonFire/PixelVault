@@ -51,3 +51,42 @@ function clientes_index() {
                          FROM usuario ORDER BY creado_el DESC');
     json_ok(array('clientes' => $stmt->fetchAll()));
 }
+
+/* Bitacora del chatbot IA que escribe n8n en la tabla chat_log.
+   Sirve para auditar que respondio la IA, que bloqueo el guardarrail
+   y que preguntas hacen los usuarios. */
+function chatlog_index() {
+    require_admin();
+    $pdo = db();
+
+    $total     = (int)$pdo->query('SELECT COUNT(*) FROM chat_log')->fetchColumn();
+    $hoy       = (int)$pdo->query('SELECT COUNT(*) FROM chat_log WHERE DATE(creado_el) = CURDATE()')->fetchColumn();
+    $conCuenta = (int)$pdo->query('SELECT COUNT(DISTINCT usuario) FROM chat_log WHERE usuario IS NOT NULL')->fetchColumn();
+    $conversaciones = (int)$pdo->query('SELECT COUNT(DISTINCT sesion) FROM chat_log')->fetchColumn();
+
+    /* Reparto por origen de la respuesta */
+    $fuentes = array('n8n' => 0, 'guardarrail' => 0, 'respaldo' => 0);
+    foreach ($pdo->query('SELECT fuente, COUNT(*) AS n FROM chat_log GROUP BY fuente') as $r) {
+        $fuentes[$r['fuente']] = (int)$r['n'];
+    }
+
+    /* Interacciones por dia (ultimos 7) */
+    $porDia = $pdo->query('SELECT DATE(creado_el) AS dia, COUNT(*) AS n
+                           FROM chat_log
+                           WHERE creado_el >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                           GROUP BY dia ORDER BY dia')->fetchAll();
+
+    /* Ultimos 30 intercambios */
+    $ultimos = $pdo->query('SELECT sesion, usuario, lang, mensaje, reply, fuente, creado_el
+                            FROM chat_log ORDER BY id DESC LIMIT 30')->fetchAll();
+
+    json_ok(array(
+        'total'          => $total,
+        'hoy'            => $hoy,
+        'con_cuenta'     => $conCuenta,
+        'conversaciones' => $conversaciones,
+        'fuentes'        => $fuentes,
+        'por_dia'        => $porDia,
+        'ultimos'        => $ultimos
+    ));
+}

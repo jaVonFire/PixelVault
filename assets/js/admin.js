@@ -39,6 +39,7 @@ function setupAdmin() {
       if (this.dataset.tab === 'overview') renderDashboard();
       if (this.dataset.tab === 'products') renderAdminProducts();
       if (this.dataset.tab === 'orders') renderAdminOrders();
+      if (this.dataset.tab === 'chat') renderAdminChat();
       applyTranslations();
     });
   });
@@ -265,4 +266,66 @@ function changeOrderStatus(id, estado) {
   apiSend('PUT', 'pedido_estado', { pedido_id: id, estado: estado }).then(function (data) {
     showToast(data.message, 'success');
   }).catch(function (err) { showToast(err.message, 'error'); });
+}
+
+/* ============ BITACORA DEL CHATBOT IA (la escribe n8n) ============ */
+var CHAT_FUENTE_COLOR = { n8n: 'var(--green)', guardarrail: 'var(--gold)', respaldo: 'var(--red-g)' };
+
+function renderAdminChat() {
+  var cont = document.getElementById('admin-chat');
+  cont.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>' + t('loading') + '</p></div>';
+  apiGet('chat_log').then(function (d) {
+    var maxDia = (d.por_dia || []).reduce(function (m, x) { return Math.max(m, Number(x.n)); }, 0) || 1;
+
+    var barras = (d.por_dia || []).map(function (x) {
+      var pct = Math.round((Number(x.n) / maxDia) * 100);
+      return '<div style="display:flex;align-items:center;gap:8px;font-size:10px;">' +
+        '<span style="width:78px;color:var(--txt-d);">' + x.dia + '</span>' +
+        '<div style="flex:1;height:14px;background:var(--bg);border:1px solid var(--border);">' +
+        '<div style="height:100%;width:' + pct + '%;background:var(--blue);"></div></div>' +
+        '<b style="width:30px;text-align:right;">' + x.n + '</b></div>';
+    }).join('') || '<p style="font-size:11px;color:var(--txt-d);">' + t('admin_no_data') + '</p>';
+
+    var fuentes = ['n8n', 'guardarrail', 'respaldo'].map(function (f) {
+      var n = (d.fuentes && d.fuentes[f]) || 0;
+      var pct = d.total ? Math.round((n / d.total) * 100) : 0;
+      return '<tr><td><span style="color:' + CHAT_FUENTE_COLOR[f] + ';">&#9679;</span> ' + t('chat_fuente_' + f) + '</td>' +
+        '<td>' + n + '</td><td>' + pct + '%</td></tr>';
+    }).join('');
+
+    var ultimos = (d.ultimos || []).map(function (r) {
+      return '<tr>' +
+        '<td style="font-size:10px;color:var(--txt-d);white-space:nowrap;">' + new Date(r.creado_el).toLocaleString(currentLang() === 'es' ? 'es' : 'en') + '</td>' +
+        '<td>' + (r.usuario ? escapeHtml(r.usuario) : '<i style="color:var(--txt-d);">anonimo</i>') + '</td>' +
+        '<td style="max-width:260px;">' + escapeHtml(r.mensaje) + '</td>' +
+        '<td style="max-width:320px;color:var(--txt-d);">' + escapeHtml(r.reply) + '</td>' +
+        '<td style="color:' + (CHAT_FUENTE_COLOR[r.fuente] || 'var(--txt)') + ';font-size:10px;">' + t('chat_fuente_' + r.fuente) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    cont.innerHTML =
+      '<h3 style="font-size:13px;color:var(--blue-g);margin-bottom:14px;"><i class="fas fa-robot"></i> ' + t('admin_chatlog_title') + '</h3>' +
+      '<div class="dash-cards" style="margin-bottom:16px;">' +
+        dashCard('fa-message-dots', 'admin_chatlog_total', d.total, 'var(--blue)') +
+        dashCard('fa-bolt', 'admin_chatlog_today', d.hoy, 'var(--gold)') +
+        dashCard('fa-comments', 'admin_chatlog_convs', d.conversaciones, 'var(--green)') +
+        dashCard('fa-user-check', 'admin_chatlog_users', d.con_cuenta, 'var(--txt)') +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" class="admin-2col">' +
+        '<div class="report-section"><h3><i class="fas fa-chart-simple"></i> ' + t('admin_chatlog_7days') + '</h3>' + barras + '</div>' +
+        '<div class="report-section"><h3><i class="fas fa-circle-half-stroke"></i> ' + t('admin_chatlog_sources') + '</h3>' +
+          '<table class="report-table"><tr><th>' + t('admin_chatlog_source') + '</th><th>#</th><th>%</th></tr>' + fuentes + '</table>' +
+          '<p style="font-size:9px;color:var(--txt-d);margin-top:10px;">n8n = ' + t('chat_fuente_n8n') +
+          ' | ' + t('chat_fuente_guardarrail') + ' | ' + t('chat_fuente_respaldo') + '</p></div>' +
+      '</div>' +
+      '<div class="report-section" style="margin-top:16px;"><h3><i class="fas fa-clock-rotate-left"></i> ' + t('admin_chatlog_last') + '</h3>' +
+        (ultimos
+          ? '<div style="overflow-x:auto;"><table class="report-table"><tr><th>' + t('chat_date') + '</th>' +
+            '<th>' + t('profile_username') + '</th><th>' + t('admin_chatlog_question') + '</th><th>' + t('admin_chatlog_answer') + '</th><th>' + t('admin_chatlog_source') + '</th></tr>' +
+            ultimos + '</table></div>'
+          : '<div class="empty-state"><i class="fas fa-inbox"></i><p>' + t('admin_no_data') + '</p></div>') +
+      '</div>';
+  }).catch(function (err) {
+    cont.innerHTML = '<p style="color:var(--red-g);">' + err.message + '</p>';
+  });
 }

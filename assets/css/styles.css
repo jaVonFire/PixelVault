@@ -257,6 +257,10 @@ select.form-input{cursor:pointer;}
 .chat-msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--border);color:var(--txt);}
 .chat-msg.user{align-self:flex-end;background:var(--blue-d);border:1px solid var(--blue);color:#fff;}
 .chat-msg .time{font-size:9px;color:var(--txt-d);margin-top:4px;display:block;}
+.chat-msg .src{font-size:8px;color:var(--green);margin-left:6px;border:1px solid var(--green);padding:1px 4px;}
+.chat-msg .src.src-guardarrail{color:var(--gold);border-color:var(--gold);}
+.chat-msg .src.src-respaldo{color:var(--red-g);border-color:var(--red);}
+.chat-msg .src.src-local{color:var(--txt-d);border-color:var(--txt-d);}
 .rating-area{display:none;border-top:2px solid var(--border);background:var(--card);flex-shrink:0;}
 .rating-area.expanded{display:block;}
 .rating-inner{padding:12px;text-align:center;}

@@ -106,6 +106,26 @@ CREATE TABLE carrito (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+--  7. CHAT_LOG  (bitacora del chatbot IA orquestado por n8n)
+--  La escribe el n8n (nodo MySQL) en cada intercambio y
+--  ademas le sirve de memoria conversacional a la IA.
+--  sesion: identificador anonimo que envia api/controllers/chat.php
+--  fuente: 'n8n' (respondio la IA) | 'guardarrail' | 'respaldo'
+-- ============================================================
+CREATE TABLE chat_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sesion VARCHAR(64) NOT NULL,
+  usuario VARCHAR(50) DEFAULT NULL,
+  lang CHAR(2) NOT NULL DEFAULT 'es',
+  mensaje VARCHAR(500) NOT NULL,
+  reply TEXT,
+  fuente VARCHAR(20) NOT NULL DEFAULT 'n8n',
+  creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_chat_sesion (sesion),
+  KEY idx_chat_fecha (creado_el)
+) ENGINE=InnoDB;
+
+-- ============================================================
 --  DATOS INICIALES
 -- ============================================================
 

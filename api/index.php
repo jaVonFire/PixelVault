@@ -110,6 +110,19 @@ switch ($action) {
         clientes_index();
         break;
 
+    /* =========== BITACORA DEL CHATBOT IA =========== */
+    case 'chat_log':
+        require_once __DIR__ . '/controllers/admin.php';
+        chatlog_index();
+        break;
+
+    /* =========== CHATBOT IA (proxy hacia n8n) =========== */
+    case 'chat':
+        if ($method !== 'POST') json_error('Metodo no permitido', 405);
+        require_once __DIR__ . '/controllers/chat.php';
+        chat_mensaje();
+        break;
+
     /* =========== RESUMEN ALERTAS (inventario bajo) =========== */
     case 'alertas':
         require_once __DIR__ . '/controllers/productos.php';
