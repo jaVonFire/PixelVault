@@ -59,6 +59,12 @@ switch ($action) {
         json_ok($u ? $u : null, $u ? 200 : 401);
         break;
 
+    case 'password':
+        if ($method !== 'PUT' && $method !== 'POST') json_error('Metodo no permitido', 405);
+        require_once __DIR__ . '/controllers/auth.php';
+        auth_change_password();
+        break;
+
     /* =========== CATEGORIAS =========== */
     case 'categorias':
         require_once __DIR__ . '/controllers/categorias.php';
@@ -107,7 +113,11 @@ switch ($action) {
     /* =========== CLIENTES ADMIN =========== */
     case 'clientes':
         require_once __DIR__ . '/controllers/admin.php';
-        clientes_index();
+        if ($method === 'DELETE') {
+            clientes_delete();
+        } else {
+            clientes_index();
+        }
         break;
 
     /* =========== BITACORA DEL CHATBOT IA =========== */

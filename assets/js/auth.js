@@ -62,7 +62,30 @@ function updateAuthUI() {
     if (navAuthBtn) navAuthBtn.style.display = '';
     if (navAdminBtn) navAdminBtn.style.display = '';
   }
+  applyRoleVisibility();
   if (typeof updateCartBadge === 'function') updateCartBadge();
+}
+
+/* ============================================================
+   EL ADMIN NO ES UN COMPRADOR.
+   Para la cuenta con rol admin se ocultan del sitio las partes
+   de tienda: la opcion "Productos" del menu, el catalogo
+   (seccion destacados/catalogo), el boton del carrito y su
+   ventana, y los botones de accion del inicio (ver catalogo /
+   crear cuenta). Asi el admin solo puede hacer tareas de
+   administracion (panel admin).
+   ============================================================ */
+function applyRoleVisibility() {
+  var isAdm = !!(currentUser && currentUser.rol === 'admin');
+
+  ['nav-products', 'cartToggle', 'cartWindow'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = isAdm ? 'none' : '';
+  });
+
+  document.querySelectorAll('.featured, .hero-actions').forEach(function (el) {
+    el.style.display = isAdm ? 'none' : '';
+  });
 }
 
 function closeUserDrop() {
@@ -119,6 +142,7 @@ function handleRegister(e) {
   var payload = {
     username: username,
     displayname: getVal('reg-displayname').trim(),
+    juego_favorito: getVal('reg-favgame').trim(),
     email: email,
     password: pass,
     password2: pass2,
@@ -127,7 +151,8 @@ function handleRegister(e) {
     plataforma: getVal('reg-platform'),
     telefono: getVal('reg-phone').trim(),
     direccion: getVal('reg-address').trim(),
-    moneda: moneda
+    moneda: moneda,
+    metodo_pago: getVal('reg-payment')
   };
 
   setLoading('reg-btn', true);

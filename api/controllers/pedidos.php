@@ -7,6 +7,10 @@
    descuenta inventario y vacia el carrito. Todo en una transaccion. */
 function pedidos_create() {
     $u = require_login();
+    /* El administrador no realiza compras */
+    if ($u['rol'] === 'admin') {
+        json_error('La cuenta de administrador no puede realizar compras', 403);
+    }
     $uid = (int)$u['id'];
     $pdo = db();
 

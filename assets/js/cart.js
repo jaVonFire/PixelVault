@@ -128,7 +128,7 @@ function renderCart() {
   cartCurrentItems.forEach(function (ci) {
     var atMax = ci.cantidad >= ci.stock;
     html += '<div class="cart-item">' +
-      '<img class="cart-item-img" src="' + ci.imagen + '" alt="">' +
+      '<img class="cart-item-img" src="' + ci.imagen + '" alt="' + escapeHtml(ci.nombre) + '" onerror="productImgFallback(this)">' +
       '<div class="cart-item-info">' +
         '<div class="cart-item-name">' + escapeHtml(ci.nombre) + '</div>' +
         '<div class="cart-item-price">' + formatPrice(ci.precio) + ' ' + t('per_unit') + '</div>' +

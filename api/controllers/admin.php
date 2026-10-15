@@ -52,6 +52,49 @@ function clientes_index() {
     json_ok(array('clientes' => $stmt->fetchAll()));
 }
 
+/* Eliminar un usuario (solo admin). El administrador NO edita los
+   datos ni la contrasena de los usuarios: unicamente puede eliminarlos.
+   Al eliminar un usuario se borran TAMBIEN sus pedidos y su carrito.
+   No se permite que el admin elimine su propia cuenta. */
+function clientes_delete() {
+    $admin = require_admin();
+
+    $d  = read_json_body();
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : (isset($d['id']) ? (int)$d['id'] : 0);
+    if ($id <= 0) {
+        json_error('ID de usuario invalido');
+    }
+    if ($id === (int)$admin['id']) {
+        json_error('No puedes eliminar tu propia cuenta de administrador');
+    }
+
+    $pdo = db();
+
+    /* Verificar que el usuario exista */
+    $stmt = $pdo->prepare('SELECT id, username FROM usuario WHERE id = ?');
+    $stmt->execute(array($id));
+    $user = $stmt->fetch();
+    if (!$user) {
+        json_error('Usuario no encontrado', 404);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        /* 1. Pedidos del usuario (detalle_pedido se borra en cascada) */
+        $pdo->prepare('DELETE FROM pedido WHERE usuario_id = ?')->execute(array($id));
+        /* 2. Carrito del usuario (por consistencia; tambien cae en cascada) */
+        $pdo->prepare('DELETE FROM carrito WHERE usuario_id = ?')->execute(array($id));
+        /* 3. Usuario */
+        $pdo->prepare('DELETE FROM usuario WHERE id = ?')->execute(array($id));
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        json_error('No se pudo eliminar el usuario: ' . $e->getMessage(), 500);
+    }
+
+    json_ok(array('message' => 'Usuario eliminado junto con sus pedidos'));
+}
+
 /* Bitacora del chatbot IA que escribe n8n en la tabla chat_log.
    Sirve para auditar que respondio la IA, que bloqueo el guardarrail
    y que preguntas hacen los usuarios. */

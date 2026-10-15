@@ -26,11 +26,17 @@ function stockLabel(p) {
   return '<div class="product-stock in"><i class="fas fa-box"></i> ' + t('stock_in', { n: s }) + '</div>';
 }
 
+/* Si la imagen del producto no carga, muestra un placeholder con el nombre. */
+function productImgFallback(img) {
+  img.onerror = null;
+  img.src = 'https://placehold.co/400x300/1f1147/a78bfa.png?text=' + encodeURIComponent(img.alt || 'PixelVault');
+}
+
 function renderProductCard(p) {
   var s = p.cantidad;
   var disponible = p.estado === 'activo';
   return '<div class="product-card" data-cat="' + p.categoria_id + '">' +
-    '<img class="product-img" src="' + p.imagen + '" alt="' + escapeHtml(p.nombre) + '" loading="lazy">' +
+    '<img class="product-img" src="' + p.imagen + '" alt="' + escapeHtml(p.nombre) + '" loading="lazy" onerror="productImgFallback(this)">' +
     '<div class="product-body">' +
       '<div class="product-cat">' + escapeHtml(p.categoria) + '</div>' +
       '<div class="product-name">' + escapeHtml(p.nombre) + '</div>' +

@@ -5,6 +5,10 @@
 
 function carrito_active() {
     $u = require_login();
+    /* El administrador gestiona la tienda, no compra en ella */
+    if ($u['rol'] === 'admin') {
+        json_error('La cuenta de administrador no puede usar el carrito de compras', 403);
+    }
     return (int)$u['id'];
 }
 

@@ -39,6 +39,7 @@ function setupAdmin() {
       if (this.dataset.tab === 'overview') renderDashboard();
       if (this.dataset.tab === 'products') renderAdminProducts();
       if (this.dataset.tab === 'orders') renderAdminOrders();
+      if (this.dataset.tab === 'users') renderAdminUsers();
       if (this.dataset.tab === 'chat') renderAdminChat();
       applyTranslations();
     });
@@ -266,6 +267,65 @@ function changeOrderStatus(id, estado) {
   apiSend('PUT', 'pedido_estado', { pedido_id: id, estado: estado }).then(function (data) {
     showToast(data.message, 'success');
   }).catch(function (err) { showToast(err.message, 'error'); });
+}
+
+/* ============ USUARIOS (lista + eliminar) ============
+   El administrador NO crea ni edita usuarios: solo ve el listado
+   y puede ELIMINARLOS. Al eliminar un usuario se borran tambien
+   sus pedidos (el backend lo hace en una transaccion). */
+function renderAdminUsers() {
+  var cont = document.getElementById('admin-users');
+  cont.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>' + t('loading') + '</p></div>';
+
+  apiGet('clientes').then(function (data) {
+    var users = data.clientes || [];
+    var yoId = currentUser ? String(currentUser.id) : '';
+
+    var head = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">' +
+      '<h3 style="font-size:13px;color:var(--blue-g);"><i class="fas fa-users"></i> ' + t('admin_users_title') + ' (' + users.length + ')</h3>' +
+      '</div>';
+
+    var rows = users.map(function (u) {
+      var esYo = String(u.id) === yoId;
+      var rolTag = u.rol === 'admin'
+        ? '<span class="tag sen">' + t('admin_role_admin') + '</span>'
+        : '<span class="tag pub">' + t('admin_role_cliente') + '</span>';
+      var acciones = esYo
+        ? '<span style="font-size:10px;color:var(--txt-d);">' + t('admin_user_self') + '</span>'
+        : '<button class="reveal-btn" style="color:var(--red-g);" onclick="deleteUser(' + u.id + ',\'' + encodeURIComponent(u.username) + '\')"><i class="fas fa-trash-can"></i> ' + t('admin_action_delete') + '</button>';
+      return '<tr>' +
+        '<td>' + u.id + '</td>' +
+        '<td>@' + escapeHtml(u.username) + '</td>' +
+        '<td>' + (u.displayname ? escapeHtml(u.displayname) : '-') + '</td>' +
+        '<td>' + escapeHtml(u.email) + '</td>' +
+        '<td>' + rolTag + '</td>' +
+        '<td>' + (u.pais ? escapeHtml(u.pais) : '-') + '</td>' +
+        '<td>' + new Date(u.creado_el).toLocaleDateString(currentLang() === 'es' ? 'es' : 'en') + '</td>' +
+        '<td style="white-space:nowrap;">' + acciones + '</td>' +
+      '</tr>';
+    }).join('');
+
+    cont.innerHTML = head +
+      '<div class="data-info"><i class="fas fa-shield-halved" style="color:var(--gold);margin-right:8px;"></i> ' + t('admin_users_note') + '</div>' +
+      '<div style="overflow-x:auto;"><table class="report-table">' +
+      '<tr><th>ID</th><th>' + t('profile_username') + '</th><th>' + t('profile_displayname') + '</th><th>' + t('profile_email') + '</th><th>' + (currentLang() === 'es' ? 'Rol' : 'Role') + '</th><th>' + (currentLang() === 'es' ? 'Pais' : 'Country') + '</th><th>' + t('chat_date') + '</th><th>' + (currentLang() === 'es' ? 'Acciones' : 'Actions') + '</th></tr>' +
+      (rows || '<tr><td colspan="8">' + t('admin_no_data') + '</td></tr>') +
+      '</table></div>';
+  }).catch(function (err) {
+    cont.innerHTML = '<p style="color:var(--red-g);">' + err.message + '</p>';
+  });
+}
+
+function deleteUser(id, usernameEnc) {
+  var username = decodeURIComponent(usernameEnc || '');
+  var ok = confirm(t('admin_confirm_delete_user', { name: username }));
+  if (!ok) return;
+  apiSend('DELETE', 'clientes', null, { id: id }).then(function (data) {
+    showToast(data.message || t('admin_delete_user_ok'), 'success');
+    renderAdminUsers();
+  }).catch(function (err) {
+    showToast(err.message, 'error');
+  });
 }
 
 /* ============ BITACORA DEL CHATBOT IA (la escribe n8n) ============ */
