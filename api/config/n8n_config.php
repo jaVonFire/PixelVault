@@ -12,9 +12,10 @@
      PV_N8N_TOKEN=secreto       header X-N8N-Token (opcional)
    ============================================================ */
 return array(
-    'activo'    => getenv('PV_N8N_ON') !== '0',
-    'webhook'   => getenv('PV_N8N_WEBHOOK') ?: 'http://localhost:5678/webhook/pixelvault-bot',
-    'token'     => getenv('PV_N8N_TOKEN') ?: '',
-    'timeout'   => 90,   /* segundos de espera maxima al webhook */
-    'max_len'   => 500   /* longitud maxima del mensaje del usuario */
+    'activo'          => getenv('PV_N8N_ON') !== '0',
+    'webhook'         => getenv('PV_N8N_WEBHOOK') ?: 'http://localhost:5678/webhook/pixelvault-bot',
+    'webhook_factura' => getenv('PV_N8N_WEBHOOK_FACTURA') ?: 'http://localhost:5678/webhook/pixelvault-factura',
+    'token'           => getenv('PV_N8N_TOKEN') ?: '',
+    'timeout'         => 90,   /* segundos de espera maxima al webhook */
+    'max_len'         => 500   /* longitud maxima del mensaje del usuario */
 );

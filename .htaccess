@@ -1,0 +1,11 @@
+# PixelVault
+# Evita que el navegador reuse versiones viejas de las paginas y scripts.
+# Asi el layout flotante (carrito, chatbot y campanita) siempre se sirve
+# con el markup actual en todas las paginas.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>

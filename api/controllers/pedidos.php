@@ -12,13 +12,14 @@ function pedidos_create() {
         json_error('La cuenta de administrador no puede realizar compras', 403);
     }
     $uid = (int)$u['id'];
+    $cfg_n8n = require __DIR__ . '/../config/n8n_config.php';
     $pdo = db();
 
     $pdo->beginTransaction();
     try {
         /* 1. Leer carrito con datos del producto */
         $stmt = $pdo->prepare(
-            'SELECT c.producto_id AS id, c.cantidad, p.nombre, p.precio, p.cantidad AS stock
+            'SELECT c.producto_id AS id, c.cantidad, p.nombre, p.precio, p.cantidad AS stock, p.imagen, p.estado
              FROM carrito c JOIN producto p ON p.id = c.producto_id
              WHERE c.usuario_id = ?');
         $stmt->execute(array($uid));
@@ -45,7 +46,7 @@ function pedidos_create() {
         $codigo = 'PV-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
 
         /* 4. Crear pedido */
-        $stmt = $pdo->prepare('INSERT INTO pedido (usuario_id, codigo, total, estado) VALUES (?,?,?, "pendiente")');
+        $stmt = $pdo->prepare("INSERT INTO pedido (usuario_id, codigo, total, estado) VALUES (?,?,?, 'pendiente')");
         $stmt->execute(array($uid, $codigo, round($total, 2)));
         $pedido_id = (int)$pdo->lastInsertId();
 
@@ -60,7 +61,25 @@ function pedidos_create() {
         /* 6. Vaciar carrito */
         $pdo->prepare('DELETE FROM carrito WHERE usuario_id=?')->execute(array($uid));
 
+        /* 7. Descartar los recordatorios de carrito ya obsoletos */
+        $pdo->prepare("DELETE FROM notificacion WHERE usuario_id=? AND tipo LIKE 'carrito%'")->execute(array($uid));
+
         $pdo->commit();
+
+        /* 8. Disparar webhook de factura (n8n) - no bloquea la compra si falla */
+        n8n_webhook_factura($cfg_n8n, array(
+            'pedido_id' => $pedido_id,
+            'codigo'    => $codigo,
+            'usuario'   => array(
+                'id'          => $uid,
+                'username'    => $u['username'],
+                'email'       => $u['email'],
+                'displayname' => isset($u['displayname']) ? $u['displayname'] : $u['username']
+            ),
+            'total'     => round($total, 2),
+            'items'     => $items,
+            'creado_el' => date('Y-m-d H:i:s')
+        ));
 
         json_ok(array(
             'pedido_id' => $pedido_id,
@@ -129,4 +148,41 @@ function pedidos_update_estado() {
         if (!$chk->fetch()) json_error('Pedido no encontrado', 404);
     }
     json_ok(array('message' => 'Estado del pedido actualizado'));
+}
+
+/* ============================================================
+   Webhook de factura (n8n): envia el pedido por correo.
+   Devuelve siempre true aunque falle (no bloquea la compra).
+   ============================================================ */
+function n8n_webhook_factura($cfg, $payload) {
+    $url = null;
+    if (is_array($cfg)) {
+        if (!empty($cfg['webhook_factura'])) $url = $cfg['webhook_factura'];
+        elseif (!empty($cfg['webhook'])) $url = $cfg['webhook'];
+    }
+    if (!$url) return false;
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    $headers = array('Content-Type: application/json', 'Accept: application/json');
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $json,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT        => 5
+        ));
+        curl_exec($ch);
+        curl_close($ch);
+        return true;
+    }
+    @file_get_contents($url, false, stream_context_create(array('http' => array(
+        'method'        => 'POST',
+        'header'        => implode("\r\n", $headers),
+        'content'       => $json,
+        'timeout'       => 5,
+        'ignore_errors' => true
+    ))));
+    return true;
 }

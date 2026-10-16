@@ -133,6 +133,16 @@ switch ($action) {
         chat_mensaje();
         break;
 
+    /* =========== NOTIFICACIONES (recordatorios de carrito) =========== */
+    case 'notificaciones':
+        require_once __DIR__ . '/controllers/notificaciones.php';
+        if ($method === 'POST') {
+            notificacion_leer();
+        } else {
+            notificaciones_index();
+        }
+        break;
+
     /* =========== RESUMEN ALERTAS (inventario bajo) =========== */
     case 'alertas':
         require_once __DIR__ . '/controllers/productos.php';

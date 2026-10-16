@@ -147,3 +147,102 @@ intercambios. Si la pestaña sale vacía, la IA nunca contestó: revisá el nodo
 - El guardarraíl es por palabras clave. Es suficiente para una tienda, pero no reemplaza
   un clasificador.
 - El historial se limita a 8 intercambios para controlar el costo de tokens.
+
+---
+
+# n8n — Recordatorio de carrito y factura por correo
+
+Dos workflows adicionales que usan n8n como orquestador:
+
+- `workflow-recordatorio-carrito.json` — avisa al cliente cuando deja el carrito sin comprar.
+- `workflow-factura-pedido.json` — envía por correo una factura al confirmar la compra.
+
+## A. Recordatorio de carrito (campanita)
+
+### Flujo
+
+```
+n8n Schedule (cada 5 s)
+   │  MySQL: INSERT ... SELECT  (avisos con deduplicación)
+   ▼
+Tabla `notificacion`  (la escribe n8n)
+   │  GET api/index.php?action=notificaciones   (lee el frontend, cada 10 s)
+   ▼
+Navegador: campanita (badge de no leídas) + sonido (Web Audio) + panel
+```
+
+### Reglas
+
+- **Aviso 1 (`carrito_1`)**: carrito inactivo **≥ 60 s**, solo clientes, sin un aviso 1
+  posterior a la última actividad.
+- **Aviso 2 (`carrito_2`)**: carrito inactivo **≥ 120 s**, con un aviso 1 enviado **≥ 60 s**
+  antes, y sin un aviso 2 posterior.
+- Nueva actividad en el carrito (`carrito.agregado_el`) **reinicia** los avisos.
+- Al comprar, `api/controllers/pedidos.php` borra los avisos de carrito del usuario.
+- Máximo 2 avisos por abandono, y para.
+
+El Schedule corre cada **5 s** y los umbrales se miden en segundos, así el aviso 1 sale a los
+**~60–65 s** y el aviso 2 **60 s después (~120–125 s)** —medido en vivo: 61 s y 121 s—, sin las
+demoras de hasta 2–3 min que aparecían al medir en minutos con un tick de 1 min. Como el workflow
+corre tan seguido, las ejecuciones exitosas se autoborran (`EXECUTIONS_DATA_PRUNE`,
+`EXECUTIONS_DATA_MAX_AGE=24` en `INICIAR-n8n.cmd`/`.env`).
+
+La deduplicación usa `NOT EXISTS ... AND n.creado_el >= c.agregado_el`, por lo que cada
+nueva actividad vuelve a habilitar los avisos sin spamear.
+
+### Fundamentos de la base de datos
+
+- `database/migracion_recordatorios.sql` — para bases ya creadas: agrega
+  `carrito.agregado_el` y crea la tabla `notificacion`.
+- `database/pixelvault.sql` — ya incluye ambos cambios (secciones 6 y 8).
+
+## B. Factura por correo
+
+### Flujo
+
+```
+api/controllers/pedidos.php  (tras COMMIT, fail-safe)
+   │  POST http://localhost:5678/webhook/pixelvault-factura
+   ▼
+n8n:  Webhook → Code (HTML factura) → Send Email (SMTP) → Respond
+```
+
+- El frontend nunca habla con n8n: el backend dispara el webhook. Si n8n está apagado,
+  **la compra igual se completa** (`n8n_webhook_factura()` no lanza excepción).
+- La URL se configura en `api/config/n8n_config.php` → `webhook_factura`
+  (env `PV_N8N_WEBHOOK_FACTURA`).
+
+### Credencial SMTP (Gmail)
+
+1. Activar 2FA en la cuenta de Google y generar un **App Password** de 16 caracteres.
+2. En n8n: **Credentials → New → SMTP**, nombrarla **`PixelVault SMTP`**:
+   - Host `smtp.gmail.com`, Port `465`, **SSL/secure: sí**
+   - User: tu correo Gmail · Password: el App Password
+3. Ajustar el remitente en el nodo **Enviar correo** (`fromEmail`).
+
+### Puesta en marcha de ambos
+
+1. Correr `database/migracion_recordatorios.sql` (o importar `pixelvault.sql` completo).
+2. Importar `workflow-recordatorio-carrito.json` y `workflow-factura-pedido.json`.
+3. Activar el de recordatorio y asociar la credencial SMTP al de factura.
+4. **Reiniciar n8n** para registrar el `Schedule Trigger` (los cambios de activación no
+   toman efecto con n8n corriendo).
+
+### Archivos nuevos
+
+| Archivo | Qué hace |
+|---|---|
+| `database/migracion_recordatorios.sql` | Migración (`agregado_el` + tabla `notificacion`). |
+| `api/controllers/notificaciones.php` | `notificaciones_index` y `notificacion_leer`. |
+| `api/controllers/pedidos.php` | Borra avisos al comprar y dispara el webhook de factura. |
+| `assets/js/notifications.js` | Campanita: poll 20 s, badge, panel, sonido, marcar leídas. |
+| `assets/css/styles.css` | `.notif-*` y animaciones (`notifRing`, reusa `badgePulse`). |
+| `components/notification-widget.html` | Copia de referencia del widget (las vistas ya lo incluyen). |
+| `n8n/workflow-recordatorio-carrito.json` | Workflow importable. |
+| `n8n/workflow-factura-pedido.json` | Workflow importable. |
+
+### Cómo comprobar
+
+- **Recordatorio**: dejar productos en el carrito logueado como cliente; en ~1 min aparece
+  la campanita con sonido; ~1 min después, el segundo aviso.
+- **Factura**: completar una compra; llega el correo con el HTML de la factura.

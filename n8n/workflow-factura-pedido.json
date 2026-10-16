@@ -1,0 +1,114 @@
+{
+  "id": "f6815a26-a60d-4650-b3e7-40ed5f1cbf9d",
+  "name": "PixelVault - Factura por correo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pixelvault-factura",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a8a8e0ef-ee10-4951-9555-ca3ad48b6483",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        300
+      ],
+      "webhookId": "ae11e52e-f58a-4dff-ad58-949051487565"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json.body || $json;\nconst nombre = (d.usuario && (d.usuario.displayname || d.usuario.username)) || (d.usuario && d.usuario.email) || 'Cliente';\nconst email = (d.usuario && d.usuario.email) || '';\nconst fecha = d.creado_el ? new Date(d.creado_el.replace(' ', 'T')).toLocaleString() : new Date().toLocaleString();\nlet filas = '';\nlet subtotal = 0;\n(d.items || []).forEach(function(it){\n  const line = Number(it.precio) * Number(it.cantidad);\n  subtotal += line;\n  filas += '<tr>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;color:#1f2937;font-weight:600;\">' + it.nombre + '</td>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:center;color:#6b7280;\">' + it.cantidad + '</td>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:right;color:#6b7280;\">$' + Number(it.precio).toFixed(2) + '</td>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:right;color:#111827;font-weight:600;\">$' + line.toFixed(2) + '</td>'\n    + '</tr>';\n});\nif(!filas){ filas = '<tr><td colspan=\"4\" style=\"padding:12px;text-align:center;color:#6b7280;\">Sin items</td></tr>'; }\nconst total = Number(d.total || subtotal).toFixed(2);\nconst html = '<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body style=\"margin:0;padding:0;background:#f3f4f6;font-family:Helvetica,Arial,sans-serif;\">'\n+ '<div style=\"max-width:600px;margin:24px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;\">'\n+ '<div style=\"background:linear-gradient(135deg,#111827,#1f2937);padding:24px 28px;\">'\n+ '<div style=\"font-size:22px;font-weight:800;letter-spacing:1px;color:#fbbf24;\">PIXELVAULT</div>'\n+ '<div style=\"font-size:12px;color:#9ca3af;margin-top:4px;letter-spacing:2px;text-transform:uppercase;\">Tu pedido confirmado</div>'\n+ '</div>'\n+ '<div style=\"padding:24px 28px;\">'\n+ '<div style=\"font-size:18px;font-weight:700;color:#111827;margin-bottom:4px;\">Gracias por tu compra, ' + nombre + '!</div>'\n+ '<div style=\"font-size:13px;color:#6b7280;margin-bottom:20px;\">Hemos recibido tu pedido y lo estaremos preparando. Guarda este correo como comprobante.</div>'\n+ '<table style=\"width:100%;border-collapse:collapse;margin-bottom:20px;\">'\n+ '<thead><tr style=\"background:#f9fafb;\">'\n+ '<th style=\"padding:10px 12px;text-align:left;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;\">Producto</th>'\n+ '<th style=\"padding:10px 12px;text-align:center;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;\">Cant.</th>'\n+ '<th style=\"padding:10px 12px;text-align:right;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;\">P. Unit.</th>'\n+ '<th style=\"padding:10px 12px;text-align:right;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;\">Subtotal</th>'\n+ '</tr></thead>'\n+ '<tbody>' + filas + '</tbody>'\n+ '</table>'\n+ '<div style=\"background:#f9fafb;border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;\">'\n+ '<span style=\"font-size:13px;color:#6b7280;letter-spacing:1px;text-transform:uppercase;\">Total pagado</span>'\n+ '<span style=\"font-size:20px;font-weight:800;color:#111827;\">$' + total + '</span>'\n+ '</div>'\n+ '<div style=\"margin-top:20px;font-size:12px;color:#9ca3af;\">'\n+ '<div><strong style=\"color:#6b7280;\">Codigo de pedido:</strong> ' + d.codigo + '</div>'\n+ '<div><strong style=\"color:#6b7280;\">Fecha:</strong> ' + fecha + '</div>'\n+ '</div>'\n+ '</div>'\n+ '<div style=\"background:#111827;padding:16px 28px;\">'\n+ '<div style=\"font-size:11px;color:#9ca3af;\">PIXELVAULT - Tu tienda de gaming de confianza. 2026</div>'\n+ '</div>'\n+ '</div></body></html>';\nreturn { json: { email: email, subject: 'PIXELVAULT - Confirmacion de pedido ' + d.codigo, html: html, codigo: d.codigo } };"
+      },
+      "id": "267d515b-6b27-479d-b9ee-a0a5e87b4fb3",
+      "name": "Generar HTML factura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "PIXELVAULT <javierandresn12@gmail.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "3cd1c019-bda7-4cd6-aac8-1f01d83fa939",
+      "name": "Enviar correo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "VD__02d6_c6RVQtE",
+          "name": "PixelVault SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ sent: true, codigo: $json.codigo }) }}",
+        "options": {}
+      },
+      "id": "37b9ade8-a12a-419a-bc1f-4546c1fa0b17",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generar HTML factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar HTML factura": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar correo": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

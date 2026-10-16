@@ -78,7 +78,7 @@ function updateAuthUI() {
 function applyRoleVisibility() {
   var isAdm = !!(currentUser && currentUser.rol === 'admin');
 
-  ['nav-products', 'cartToggle', 'cartWindow'].forEach(function (id) {
+  ['nav-products', 'cartToggle', 'cartWindow', 'notifToggle', 'notifWindow'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.style.display = isAdm ? 'none' : '';
   });

@@ -100,6 +100,7 @@ CREATE TABLE carrito (
   usuario_id INT NOT NULL,
   producto_id INT NOT NULL,
   cantidad INT NOT NULL DEFAULT 1,
+  agregado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_carrito (usuario_id, producto_id),
   CONSTRAINT fk_carrito_usuario FOREIGN KEY (usuario_id)
     REFERENCES usuario(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -125,6 +126,28 @@ CREATE TABLE chat_log (
   creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_chat_sesion (sesion),
   KEY idx_chat_fecha (creado_el)
+) ENGINE=InnoDB;
+
+-- ============================================================
+--  8. NOTIFICACION  (avisos generados por n8n para el usuario)
+--  Las escribe el n8n (workflow "Recordatorio Carrito") cuando un
+--  cliente deja productos sin comprar. El frontend las lee con
+--  api/controllers/notificaciones.php y las muestra en la campanita.
+--  tipo: 'carrito_1' (primer aviso) | 'carrito_2' (recordatorio final)
+--  leida: 0 = no leida (cuenta en la campanita) | 1 = leida
+-- ============================================================
+CREATE TABLE notificacion (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  tipo VARCHAR(30) NOT NULL,
+  titulo VARCHAR(120) NOT NULL,
+  mensaje VARCHAR(255) NOT NULL,
+  leida TINYINT(1) NOT NULL DEFAULT 0,
+  creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_notif_usuario (usuario_id, leida),
+  KEY idx_notif_fecha (creado_el),
+  CONSTRAINT fk_notif_usuario FOREIGN KEY (usuario_id)
+    REFERENCES usuario(id) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ============================================================

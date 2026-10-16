@@ -1,0 +1,110 @@
+{
+  "id": "6a0009d9-5d1c-4a68-bce6-77088b62815b",
+  "name": "PixelVault - Recordatorio Carrito",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificacion (usuario_id, tipo, titulo, mensaje)\nSELECT c.usuario_id, 'carrito_1', 'Tu carrito te espera',\n       CONCAT('Tienes ', COUNT(DISTINCT c.producto_id), ' producto(s) esperando en tu carrito. ¡Termina tu compra ahora!')\nFROM carrito c\nINNER JOIN usuario u ON u.id = c.usuario_id AND u.rol = 'cliente'\nWHERE TIMESTAMPDIFF(SECOND, c.agregado_el, NOW()) >= 60\n  AND NOT EXISTS (\n    SELECT 1 FROM notificacion n\n    WHERE n.usuario_id = c.usuario_id\n      AND n.tipo = 'carrito_1'\n      AND n.creado_el >= c.agregado_el\n  )\nGROUP BY c.usuario_id;",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Aviso 1 (carrito_1)",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -40,
+        200
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificacion (usuario_id, tipo, titulo, mensaje)\nSELECT c.usuario_id, 'carrito_2', '¡Última oportunidad!',\n       'Tu carrito sigue esperando. Los productos que quieres podrían agotarse. ¡Complétalo ahora!'\nFROM carrito c\nINNER JOIN usuario u ON u.id = c.usuario_id AND u.rol = 'cliente'\nWHERE TIMESTAMPDIFF(SECOND, c.agregado_el, NOW()) >= 120\n  AND EXISTS (\n    SELECT 1 FROM notificacion n1\n    WHERE n1.usuario_id = c.usuario_id\n      AND n1.tipo = 'carrito_1'\n      AND n1.creado_el >= c.agregado_el\n      AND n1.creado_el <= DATE_SUB(NOW(), INTERVAL 60 SECOND)\n  )\n  AND NOT EXISTS (\n    SELECT 1 FROM notificacion n2\n    WHERE n2.usuario_id = c.usuario_id\n      AND n2.tipo = 'carrito_2'\n      AND n2.creado_el >= c.agregado_el\n  )\nGROUP BY c.usuario_id;",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Aviso 2 (carrito_2)",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -40,
+        400
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "PIXELVAULT - Recordatorio de carrito\n\nSe ejecuta cada 5 segundos (las ejecuciones exitosas se autoborran a las 24 h).\n\n- Aviso 1 (carrito_1): carrito inactivo >= 60 s y sin aviso 1 posterior a la ultima actividad.\n- Aviso 2 (carrito_2): carrito inactivo >= 120 s, con aviso 1 enviado >= 60 s antes, y sin aviso 2 posterior.\n\nNueva actividad en el carrito (que actualiza agregado_el) reinicia los avisos.\nSi el cliente compra, api/controllers/pedidos.php borra sus avisos.\nSolo clientes (rol = 'cliente').",
+        "height": 220,
+        "width": 460
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -780,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Aviso 1 (carrito_1)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aviso 2 (carrito_2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}

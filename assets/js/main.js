@@ -37,6 +37,7 @@ function loadMyOrders() {
   loadMe().then(function (u) {
     updateAuthUI();
     if (typeof updateRateButtonState === 'function') updateRateButtonState();
+    if (typeof initNotifications === 'function') initNotifications(u);
     if (u) return refreshCart().then(function () { return u; });
     return u;
   }).then(function (u) {

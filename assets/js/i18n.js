@@ -77,6 +77,10 @@ var I18N = {
     cart_added: 'agregado al carrito',
     cart_removed: 'Producto eliminado del carrito',
     stock_not_enough_order: 'Stock insuficiente de un producto. Revisa tu carrito.',
+    notif_title: 'NOTIFICACIONES',
+    notif_empty: 'No tienes notificaciones',
+    notif_mark_all: 'MARCAR LEIDAS',
+    notif_new: 'Tienes un nuevo recordatorio de carrito',
 
     /* Checkout */
     co_summary: 'RESUMEN DEL PEDIDO',
@@ -396,6 +400,10 @@ var I18N = {
     cart_added: 'added to cart',
     cart_removed: 'Product removed from cart',
     stock_not_enough_order: 'Insufficient stock for a product. Check your cart.',
+    notif_title: 'NOTIFICATIONS',
+    notif_empty: 'No notifications',
+    notif_mark_all: 'MARK ALL READ',
+    notif_new: 'You have a new cart reminder',
 
     /* Checkout */
     co_summary: 'ORDER SUMMARY',
