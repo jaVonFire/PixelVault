@@ -1,0 +1,475 @@
+{
+  "id": "f6815a26-a60d-4650-b3e7-40ed5f1cbf9d",
+  "name": "PixelVault - Post-Compra (automatizacion)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -620,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.id AS pedido_id, p.total, p.creado_el,\n  u.id AS usuario_id, u.username, u.displayname, u.email, u.moneda, u.puntos, u.nivel,\n  (SELECT COUNT(*) FROM pedido p2 WHERE p2.usuario_id = u.id AND p2.id < p.id) AS compras_previas,\n  d.nombre_producto, d.precio, d.cantidad, d.producto_id,\n  pr.cantidad AS prod_stock, pr.stock_minimo AS prod_stock_min, pr.nombre AS prod_nombre\nFROM pedido p\nJOIN usuario u ON u.id = p.usuario_id\nJOIN detalle_pedido d ON d.pedido_id = p.id\nJOIN producto pr ON pr.id = d.producto_id\nWHERE p.facturado_el IS NULL\nORDER BY p.id",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000002",
+      "name": "Pedidos nuevos",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -380,
+        140
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $input.all().map(function(i){ return i.json; });\nconst orders = new Map();\nfor (const r of rows) {\n  const pid = r.pedido_id;\n  if (!orders.has(pid)) {\n    orders.set(pid, {\n      pedido_id: pid,\n      usuario_id: r.usuario_id,\n      email: r.email,\n      nombre: r.displayname || r.username || r.email,\n      moneda: r.moneda || 'USD',\n      total: Number(r.total),\n      creado_el: String(r.creado_el || ''),\n      puntos_previos: Number(r.puntos) || 0,\n      compras_previas: Number(r.compras_previas) || 0,\n      items: [],\n      baja_stock: []\n    });\n  }\n  const o = orders.get(pid);\n  o.items.push({ nombre: r.nombre_producto, cantidad: Number(r.cantidad), precio: Number(r.precio) });\n  if (Number(r.prod_stock) <= Number(r.prod_stock_min)) {\n    o.baja_stock.push(r.prod_nombre + ' (quedan ' + r.prod_stock + ' uds)');\n  }\n}\nfunction money(n, cur){ return (cur === 'USD' ? '$' : cur + ' ') + Number(n).toFixed(2); }\nconst out = [];\nconst running = new Map();\nfor (const o of orders.values()) {\n  if (!running.has(o.usuario_id)) running.set(o.usuario_id, o.puntos_previos);\n  const base = running.get(o.usuario_id);\n  const ganados = Math.floor(o.total);\n  const puntos_total = base + ganados;\n  running.set(o.usuario_id, puntos_total);\n  const nivel_key = puntos_total >= 600 ? 'platino' : puntos_total >= 300 ? 'oro' : puntos_total >= 100 ? 'plata' : 'nuevo';\n  const nivel = nivel_key.charAt(0).toUpperCase() + nivel_key.slice(1);\n  let cupon_pct = 0, cupon_tipo = '';\n  if (o.total >= 150) { cupon_pct = 10; cupon_tipo = 'Compra de alto valor'; }\n  else if (o.compras_previas === 0) { cupon_pct = 5; cupon_tipo = 'Cliente nuevo'; }\n  const cupon_codigo = cupon_pct ? ('PV' + cupon_pct + '-' + String(o.pedido_id) + '-' + Math.random().toString(36).slice(2,6).toUpperCase()) : '';\n  const admin_alert = (o.total >= 250 || o.baja_stock.length > 0);\n  let filas = '';\n  o.items.forEach(function(it){\n    const line = it.precio * it.cantidad;\n    filas += '<tr>'\n      + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;color:#1f2937;font-weight:600;\">' + it.nombre + '</td>'\n      + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:center;color:#6b7280;\">' + it.cantidad + '</td>'\n      + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:right;color:#6b7280;\">' + money(it.precio, o.moneda) + '</td>'\n      + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:right;color:#111827;font-weight:600;\">' + money(line, o.moneda) + '</td>'\n      + '</tr>';\n  });\n  if (!filas) filas = '<tr><td colspan=\"4\" style=\"padding:12px;text-align:center;color:#6b7280;\">Sin items</td></tr>';\n  const fidelidad = '<div style=\"margin-top:18px;padding:14px 16px;border-radius:10px;background:#111827;color:#e5e7eb;\">'\n    + '<div style=\"font-size:12px;color:#fbbf24;font-weight:700;letter-spacing:1px;text-transform:uppercase;\">Programa de fidelidad</div>'\n    + '<div style=\"margin-top:6px;font-size:14px;\">Ganaste <b style=\"color:#fbbf24;\">+' + ganados + ' puntos</b> con esta compra.</div>'\n    + '<div style=\"margin-top:2px;font-size:14px;\">Ahora tienes <b>' + puntos_total + ' puntos</b> - nivel <b style=\"color:#fbbf24;\">' + nivel + '</b>.</div>'\n    + '</div>';\n  let cupon = '';\n  if (cupon_codigo) {\n    cupon = '<div style=\"margin-top:14px;padding:16px;border-radius:10px;border:2px dashed #fbbf24;background:#fffbeb;text-align:center;\">'\n      + '<div style=\"font-size:12px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:1px;\">Cupon ' + cupon_tipo + '</div>'\n      + '<div style=\"margin-top:6px;font-size:26px;font-weight:800;color:#111827;\">' + cupon_pct + '% OFF</div>'\n      + '<div style=\"margin-top:4px;font-size:14px;color:#374151;\">Usa el codigo</div>'\n      + '<div style=\"margin-top:3px;font-size:18px;font-weight:800;letter-spacing:2px;color:#b45309;\">' + cupon_codigo + '</div>'\n      + '<div style=\"margin-top:6px;font-size:12px;color:#6b7280;\">Valido por 30 dias en tu proxima compra.</div>'\n      + '</div>';\n  }\n  const html = '<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body style=\"margin:0;padding:0;background:#f3f4f6;font-family:Helvetica,Arial,sans-serif;\">'\n    + '<div style=\"max-width:600px;margin:24px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;\">'\n    + '<div style=\"background:linear-gradient(135deg,#111827,#1f2937);padding:24px 28px;\">'\n    + '<div style=\"font-size:22px;font-weight:800;letter-spacing:1px;color:#fbbf24;\">PIXELVAULT</div>'\n    + '<div style=\"font-size:12px;color:#9ca3af;margin-top:4px;letter-spacing:2px;text-transform:uppercase;\">Tu pedido confirmado</div>'\n    + '</div>'\n    + '<div style=\"padding:24px 28px;\">'\n    + '<p style=\"margin:0 0 6px;font-size:16px;color:#111827;\">Hola <b>' + o.nombre + '</b>,</p>'\n    + '<p style=\"margin:0 0 16px;font-size:14px;color:#6b7280;\">Gracias por tu compra. Aqui esta tu factura.</p>'\n    + '<table style=\"width:100%;border-collapse:collapse;font-size:14px;\">'\n    + '<tr style=\"background:#f9fafb;\"><th style=\"padding:9px 12px;text-align:left;color:#6b7280;font-size:11px;text-transform:uppercase;\">Producto</th><th style=\"padding:9px 12px;text-align:center;color:#6b7280;font-size:11px;text-transform:uppercase;\">Cant.</th><th style=\"padding:9px 12px;text-align:right;color:#6b7280;font-size:11px;text-transform:uppercase;\">Precio</th><th style=\"padding:9px 12px;text-align:right;color:#6b7280;font-size:11px;text-transform:uppercase;\">Subtotal</th></tr>'\n    + filas\n    + '</table>'\n    + '<div style=\"text-align:right;margin-top:14px;font-size:18px;color:#111827;\"><b>Total: ' + money(o.total, o.moneda) + '</b></div>'\n    + fidelidad\n    + cupon\n    + '<p style=\"margin:20px 0 0;font-size:12px;color:#9ca3af;\">Pedido #' + o.pedido_id + ' - ' + o.creado_el + '</p>'\n    + '</div>'\n    + '<div style=\"padding:14px 28px;background:#f9fafb;font-size:11px;color:#9ca3af;text-align:center;\">PIXELVAULT - Correo automatico, no responder.</div>'\n    + '</div></body></html>';\n  let admin_html = '<h3>Automatizacion PIXELVAULT - Pedido #' + o.pedido_id + '</h3>'\n    + '<p>Cliente: ' + o.email + '<br>Total: ' + money(o.total, o.moneda) + '<br>Nivel: ' + nivel + '</p>';\n  if (o.baja_stock.length) admin_html += '<p><b>Stock bajo tras la compra:</b> ' + o.baja_stock.join(', ') + '</p>';\n  if (o.total >= 250) admin_html += '<p><b>Pedido de alto valor.</b></p>';\n  out.push({ json: {\n    pedido_id: o.pedido_id,\n    usuario_id: o.usuario_id,\n    email: o.email,\n    subject: 'Tu factura PIXELVAULT - Pedido #' + o.pedido_id,\n    email_html: html,\n    puntos_total: puntos_total,\n    nivel: nivel,\n    nivel_key: nivel_key,\n    puntos_ganados: ganados,\n    cupon_codigo: cupon_codigo,\n    cupon_pct: cupon_pct,\n    cupon_tipo: cupon_tipo,\n    admin_flag: admin_alert ? 'si' : '',\n    admin_subject: 'PIXELVAULT - Alerta pedido #' + o.pedido_id,\n    admin_html: admin_html,\n    resumen: 'Factura enviada; +' + ganados + ' pts; nivel ' + nivel + (cupon_codigo ? ('; cupon ' + cupon_codigo) : '')\n  }});\n}\nreturn out;"
+      },
+      "id": "b1000000-0000-4000-8000-000000000003",
+      "name": "Decisiones + factura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -140,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE usuario SET puntos = puntos + {{ $json.puntos_ganados }}, nivel = CASE WHEN puntos >= 600 THEN 'platino' WHEN puntos >= 300 THEN 'oro' WHEN puntos >= 100 THEN 'plata' ELSE 'nuevo' END WHERE id = {{ $json.usuario_id }};",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000004",
+      "name": "Guardar fidelidad",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        160,
+        -140
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "b1000000-0000-4000-8000-000000000005-c",
+              "leftValue": "={{ $json.cupon_codigo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000005",
+      "name": "Tiene cupon?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO cupon (codigo, usuario_id, pedido_id, descuento_pct, motivo, estado, expira_el) VALUES ('{{ $json.cupon_codigo }}', {{ $json.usuario_id }}, {{ $json.pedido_id }}, {{ $json.cupon_pct }}, '{{ $json.cupon_tipo }}', 'activo', DATE_ADD(NOW(), INTERVAL 30 DAY));",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000006",
+      "name": "Guardar cupon",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        420,
+        20
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pedido SET facturado_el = NOW() WHERE id = {{ $json.pedido_id }};",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000007",
+      "name": "Marcar facturado",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        160,
+        200
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO automatizacion_log (pedido_id, usuario_id, tipo, detalle) VALUES ({{ $json.pedido_id }}, {{ $json.usuario_id }}, 'post_compra', '{{ $json.resumen }}');",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000008",
+      "name": "Registrar log",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        160,
+        380
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "PIXELVAULT <javierandresn12@gmail.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.email_html }}",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000009",
+      "name": "Enviar factura",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        160,
+        560
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "VD__02d6_c6RVQtE",
+          "name": "PixelVault SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "b1000000-0000-4000-8000-00000000000a-c",
+              "leftValue": "={{ $json.admin_flag }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-00000000000a",
+      "name": "Avisar admin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "PIXELVAULT <javierandresn12@gmail.com>",
+        "toEmail": "javierandresn12@gmail.com",
+        "subject": "={{ $json.admin_subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.admin_html }}",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-00000000000b",
+      "name": "Aviso admin",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        420,
+        740
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "VD__02d6_c6RVQtE",
+          "name": "PixelVault SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id AS pedido_id, p.codigo, p.total, p.creado_el,\n       u.username, u.displayname, u.email, u.moneda\nFROM pedido p\nJOIN usuario u ON u.id = p.usuario_id\nWHERE p.resena_enviada = 0\n  AND p.estado <> 'cancelado'\n  AND p.facturado_el IS NOT NULL\n  AND p.creado_el <= DATE_SUB(NOW(), INTERVAL 1 DAY)\n  AND p.creado_el >= DATE_SUB(NOW(), INTERVAL 2 DAY)\nORDER BY p.id",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-00000000000c",
+      "name": "Resenas pendientes",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -380,
+        620
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map(function(i){ return i.json; });\nconst out = [];\nfor (const r of items) {\n  const nombre = r.displayname || r.username || r.email;\n  const html = '<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body style=\"margin:0;padding:0;background:#f3f4f6;font-family:Helvetica,Arial,sans-serif;\">'\n    + '<div style=\"max-width:600px;margin:24px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;\">'\n    + '<div style=\"background:linear-gradient(135deg,#111827,#1f2937);padding:24px 28px;\">'\n    + '<div style=\"font-size:22px;font-weight:800;letter-spacing:1px;color:#fbbf24;\">PIXELVAULT</div>'\n    + '<div style=\"font-size:12px;color:#9ca3af;margin-top:4px;letter-spacing:2px;text-transform:uppercase;\">Como te fue con tu compra</div>'\n    + '</div>'\n    + '<div style=\"padding:24px 28px;\">'\n    + '<p style=\"margin:0 0 8px;font-size:16px;color:#111827;\">Hola <b>' + nombre + '</b>,</p>'\n    + '<p style=\"margin:0 0 16px;font-size:14px;color:#6b7280;\">Hace poco compraste en PIXELVAULT (pedido #' + r.pedido_id + '). Nos encantaria saber que tal te parecio. Tu opinion nos ayuda a mejorar.</p>'\n    + '<p style=\"margin:0 0 20px;\"><a href=\"http://localhost/pixelV/views/products.html\" style=\"display:inline-block;background:#fbbf24;color:#111827;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:8px;\">Dejanos tu resena</a></p>'\n    + '<p style=\"margin:0;font-size:12px;color:#9ca3af;\">Gracias por ser parte de PIXELVAULT.</p>'\n    + '</div>'\n    + '<div style=\"padding:14px 28px;background:#f9fafb;font-size:11px;color:#9ca3af;text-align:center;\">PIXELVAULT - Correo automatico, no responder.</div>'\n    + '</div></body></html>';\n  out.push({ json: Object.assign({}, r, { subject: 'Como te fue con tu pedido PIXELVAULT #' + r.pedido_id, review_html: html }) });\n}\nreturn out;"
+      },
+      "id": "b1000000-0000-4000-8000-00000000000d",
+      "name": "Armar correo resena",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -140,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "PIXELVAULT <javierandresn12@gmail.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.review_html }}",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-00000000000e",
+      "name": "Pedir resena",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        120,
+        620
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "VD__02d6_c6RVQtE",
+          "name": "PixelVault SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pedido SET resena_enviada = 1 WHERE id = {{ $json.pedido_id }};",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-00000000000f",
+      "name": "Marcar resena",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        360,
+        620
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "PIXELVAULT - Automatizacion Post-Compra\n\nSe ejecuta cada 30 s. No depende de que PHP la dispare: ella sola detecta la actividad en la BD.\n\nRAMA A - pedidos nuevos (pedido.facturado_el IS NULL):\n  1) Calcula puntos de fidelidad (1 pt = 1 unidad de moneda) y nivel (Nuevo/Plata/Oro/Platino).\n  2) Genera cupon: 10% si el total >= 150; 5% si es su primera compra.\n  3) Guarda cupon + fidelidad, marca el pedido como facturado y registra en automatizacion_log.\n  4) Envia la factura al cliente (con puntos y cupon).\n  5) Si el total >= 250 o quedo stock <= stock_minimo -> envia aviso al admin.\n\nRAMA B - seguimiento: a los 1 dia de la compra (ventana de 1-2 dias) envia correo pidiendo resena y marca resena_enviada.\n\nIdempotencia: facturado_el / resena_enviada evitan duplicados.\nEditar el intervalo o la ventana de 1 dia es directo en los nodos Schedule y Resenas pendientes.",
+        "height": 460,
+        "width": 460
+      },
+      "id": "b1000000-0000-4000-8000-000000000010",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Pedidos nuevos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Resenas pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedidos nuevos": {
+      "main": [
+        [
+          {
+            "node": "Decisiones + factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decisiones + factura": {
+      "main": [
+        [
+          {
+            "node": "Guardar fidelidad",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tiene cupon?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Marcar facturado",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registrar log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Enviar factura",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Avisar admin?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiene cupon?": {
+      "main": [
+        [
+          {
+            "node": "Guardar cupon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avisar admin?": {
+      "main": [
+        [
+          {
+            "node": "Aviso admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resenas pendientes": {
+      "main": [
+        [
+          {
+            "node": "Armar correo resena",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar correo resena": {
+      "main": [
+        [
+          {
+            "node": "Pedir resena",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Marcar resena",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}

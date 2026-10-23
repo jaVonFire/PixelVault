@@ -150,12 +150,15 @@ intercambios. Si la pestaña sale vacía, la IA nunca contestó: revisá el nodo
 
 ---
 
-# n8n — Recordatorio de carrito y factura por correo
+# n8n — Recordatorio de carrito, post-compra y alerta de stock
 
-Dos workflows adicionales que usan n8n como orquestador:
+Tres workflows adicionales que usan n8n como orquestador:
 
 - `workflow-recordatorio-carrito.json` — avisa al cliente cuando deja el carrito sin comprar.
-- `workflow-factura-pedido.json` — envía por correo una factura al confirmar la compra.
+- `workflow-postcompra.json` — factura por correo y toda la posventa (fidelidad, cupones,
+  aviso al admin y correo de reseña), disparándose solo cada 30 s.
+- `workflow-stock-bajo.json` — avisa al admin por correo cuando un producto baja de su stock
+  mínimo (corto y aparte de los otros dos).
 
 ## A. Recordatorio de carrito (campanita)
 
@@ -196,53 +199,131 @@ nueva actividad vuelve a habilitar los avisos sin spamear.
   `carrito.agregado_el` y crea la tabla `notificacion`.
 - `database/pixelvault.sql` — ya incluye ambos cambios (secciones 6 y 8).
 
-## B. Factura por correo
+## B. Automatización Post-Compra (factura, fidelidad, cupones, admin y reseña)
+
+Un solo workflow, `workflow-postcompra.json`, que n8n ejecuta **solo cada 30 s** (sin que
+nadie lo dispare). Detecta los pedidos nuevos y arranca la posventa.
 
 ### Flujo
 
 ```
-api/controllers/pedidos.php  (tras COMMIT, fail-safe)
-   │  POST http://localhost:5678/webhook/pixelvault-factura
-   ▼
-n8n:  Webhook → Code (HTML factura) → Send Email (SMTP) → Respond
+n8n Schedule (cada 30 s)
+   ├─ MySQL: pedidos nuevos sin facturar (pedido.facturado_el IS NULL)
+   │     ▼
+   │  Code (arma el HTML de la factura + aplica las reglas de negocio)
+   │     ├─ MySQL: Guardar fidelidad   (usuario.puntos += total, recalcula nivel)
+   │     ├─ IF: ¿aplica cupón?  → MySQL: Guardar cupón (tabla cupon)
+   │     ├─ MySQL: Marcar facturado    (pedido.facturado_el = NOW())
+   │     ├─ MySQL: Registrar log       (tabla automatizacion_log)
+   │     ├─ Send Email: Enviar factura → cliente
+   │     └─ IF: ¿avisar admin? → Send Email: Aviso admin
+   │
+   └─ MySQL: reseñas pendientes (facturado hace 1–2 días y resena_enviada = 0)
+         ▼
+      Code (arma el correo de reseña)
+         ├─ Send Email: Pedir reseña → cliente
+         └─ MySQL: Marcar reseña (pedido.resena_enviada = 1)
 ```
 
-- El frontend nunca habla con n8n: el backend dispara el webhook. Si n8n está apagado,
-  **la compra igual se completa** (`n8n_webhook_factura()` no lanza excepción).
-- La URL se configura en `api/config/n8n_config.php` → `webhook_factura`
-  (env `PV_N8N_WEBHOOK_FACTURA`).
+### Reglas de negocio
 
-### Credencial SMTP (Gmail)
+- **Fidelidad**: 1 punto por cada unidad de `total`. Nivel: **≥600 platino, ≥300 oro,
+  ≥100 plata**, si no `nuevo`. Los puntos son **acumulativos** (`puntos = puntos + total`),
+  porque MariaDB evalúa las asignaciones de un `UPDATE` de izquierda a derecha.
+- **Cupón**: **10 %** (`Compra de alto valor`) si el total ≥ 150; si no, **5 %**
+  (`Cliente nuevo`) solo en la **primera compra** del usuario (detectada por `p2.id < p.id`).
+  El código es `PV10-<pedido>-<rand>` y expira en 30 días.
+- **Aviso al admin**: si el total ≥ 250 **o** algún producto quedó en stock ≤ `stock_minimo`.
+- **Reseña**: un correo pidiendo reseña **1 día** después de facturar (ventana 1–2 días),
+  una sola vez por pedido (`resena_enviada`).
+
+### Sin webhook (por qué)
+
+La versión anterior disparaba `POST /webhook/pixelvault-factura` desde `pedidos.php`. Eso se
+**eliminó**: la automatización **detecta sola** el pedido con `facturado_el IS NULL`. Así, si
+n8n está apagado durante una compra, al volver **igual la procesa** (ningún pedido se pierde).
+
+## C. Alerta de stock bajo
+
+Un workflow **corto y aparte**, `workflow-stock-bajo.json`, cuya única tarea es **avisar al
+admin por correo cuando un producto baja de su stock mínimo**. No manda nada al cliente.
+Corre **solo cada 30 s**.
+
+### Flujo
+
+```
+n8n Schedule (cada 30 s)
+   ▼
+MySQL: Reponer        (si un producto ya se repuso: alerta_stock_enviada = 0)
+   ▼
+MySQL: Stock bajo     (productos con cantidad <= stock_minimo y alerta_stock_enviada = 0)
+   │  ── si no hay ninguno, el flujo se detiene (no manda correo)
+   ▼
+Code: Armar aviso     (arma el HTML con la lista de productos)
+   ├─ Send Email: Aviso admin → admin   (con 3 reintentos)
+   └─ MySQL: Marcar avisado (alerta_stock_enviada = 1)
+```
+
+### Reglas
+
+- Se avisa **una sola vez por producto**: al avisar se marca `alerta_stock_enviada = 1`, así no
+  repite el correo en cada ejecución.
+- Cuando el producto **se repone** (`cantidad > stock_minimo`), el nodo `Reponer` vuelve a poner
+  la marca en **0**; si vuelve a bajar, **vuelve a avisar**.
+- El correo llega **solo al admin** (`javierandresn12@gmail.com`), nunca al cliente.
+- El asunto dice cuántos productos van bajos y la tabla muestra producto, stock y mínimo; los
+  agotados (stock 0) salen en rojo.
+
+### Base de datos
+
+- `database/migracion_alerta_stock.sql` — agrega `producto.alerta_stock_enviada`.
+- `database/pixelvault.sql` — la tabla `producto` ya incluye la columna.
+
+## Credencial SMTP (Gmail)
 
 1. Activar 2FA en la cuenta de Google y generar un **App Password** de 16 caracteres.
 2. En n8n: **Credentials → New → SMTP**, nombrarla **`PixelVault SMTP`**:
    - Host `smtp.gmail.com`, Port `465`, **SSL/secure: sí**
    - User: tu correo Gmail · Password: el App Password
-3. Ajustar el remitente en el nodo **Enviar correo** (`fromEmail`).
+3. Asociar esa credencial a los nodos de correo: `Enviar factura`, `Aviso admin` y
+   `Pedir reseña` (post-compra) y `Aviso admin` (stock bajo).
 
-### Puesta en marcha de ambos
+## Puesta en marcha de los tres
 
-1. Correr `database/migracion_recordatorios.sql` (o importar `pixelvault.sql` completo).
-2. Importar `workflow-recordatorio-carrito.json` y `workflow-factura-pedido.json`.
-3. Activar el de recordatorio y asociar la credencial SMTP al de factura.
-4. **Reiniciar n8n** para registrar el `Schedule Trigger` (los cambios de activación no
+1. Correr las migraciones `database/migracion_recordatorios.sql`,
+   `database/migracion_automatizacion.sql` y `database/migracion_alerta_stock.sql`
+   (o importar `pixelvault.sql` completo).
+2. Importar `workflow-recordatorio-carrito.json`, `workflow-postcompra.json` y
+   `workflow-stock-bajo.json`.
+3. Activar los tres y asociar la credencial SMTP a sus nodos de correo.
+4. **Reiniciar n8n** para registrar los `Schedule Trigger` (los cambios de activación no
    toman efecto con n8n corriendo).
 
-### Archivos nuevos
+## Archivos nuevos
 
 | Archivo | Qué hace |
 |---|---|
 | `database/migracion_recordatorios.sql` | Migración (`agregado_el` + tabla `notificacion`). |
+| `database/migracion_automatizacion.sql` | Migración post-compra: `pedido.facturado_el`, `pedido.resena_enviada`, `usuario.puntos`, `usuario.nivel` + tablas `cupon` y `automatizacion_log`. |
+| `database/migracion_alerta_stock.sql` | Migración stock bajo: `producto.alerta_stock_enviada`. |
 | `api/controllers/notificaciones.php` | `notificaciones_index` y `notificacion_leer`. |
-| `api/controllers/pedidos.php` | Borra avisos al comprar y dispara el webhook de factura. |
+| `api/controllers/pedidos.php` | Borra avisos de carrito al comprar. |
 | `assets/js/notifications.js` | Campanita: poll 20 s, badge, panel, sonido, marcar leídas. |
 | `assets/css/styles.css` | `.notif-*` y animaciones (`notifRing`, reusa `badgePulse`). |
 | `components/notification-widget.html` | Copia de referencia del widget (las vistas ya lo incluyen). |
 | `n8n/workflow-recordatorio-carrito.json` | Workflow importable. |
-| `n8n/workflow-factura-pedido.json` | Workflow importable. |
+| `n8n/workflow-postcompra.json` | Workflow importable. |
+| `n8n/workflow-stock-bajo.json` | Workflow importable. |
 
-### Cómo comprobar
+## Cómo comprobar
 
 - **Recordatorio**: dejar productos en el carrito logueado como cliente; en ~1 min aparece
   la campanita con sonido; ~1 min después, el segundo aviso.
-- **Factura**: completar una compra; llega el correo con el HTML de la factura.
+- **Post-compra**: completar una compra; en **≤30 s** llega el correo con el HTML de la
+  factura, el usuario gana puntos (y sube de nivel), se genera el cupón si aplica y queda el
+  registro en `automatizacion_log`. Para ver la **reseña** sin esperar un día, adelantar
+  `pedido.creado_el` y poner `resena_enviada = 0`; en el próximo tick sale el correo.
+- **Stock bajo**: bajar el `cantidad` de un producto a ≤ su `stock_minimo` (o venderlo hasta
+  agotarlo); en **≤30 s** llega el correo al admin y el producto queda marcado. No se repite
+  hasta que repongas el stock. Para forzarlo a mano:
+  `UPDATE producto SET alerta_stock_enviada = 0 WHERE id = 5;` y esperar el tick.

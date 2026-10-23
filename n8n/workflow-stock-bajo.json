@@ -1,0 +1,207 @@
+{
+  "id": "e7c1a2b3-4d5e-4f60-8a9b-1c2d3e4f5a6b",
+  "name": "PixelVault - Alerta de Stock Bajo",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "c7000000-0000-4000-8000-000000000001",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE producto SET alerta_stock_enviada = 0 WHERE cantidad > stock_minimo AND alerta_stock_enviada = 1;",
+        "options": {}
+      },
+      "id": "c7000000-0000-4000-8000-000000000002",
+      "name": "Reponer",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -320,
+        300
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, nombre, cantidad, stock_minimo\nFROM producto\nWHERE cantidad <= stock_minimo\n  AND alerta_stock_enviada = 0\nORDER BY (stock_minimo - cantidad) DESC, nombre",
+        "options": {}
+      },
+      "id": "c7000000-0000-4000-8000-000000000003",
+      "name": "Stock bajo",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -80,
+        300
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $input.all().map(function(i){ return i.json; });\nfunction esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }\nlet filas = '';\nfor (const r of rows) {\n  const stock = Number(r.cantidad);\n  const min = Number(r.stock_minimo);\n  const agotado = stock <= 0;\n  const estado = agotado ? 'AGOTADO' : ('Quedan ' + stock);\n  const color = agotado ? '#dc2626' : '#b45309';\n  filas += '<tr>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;color:#1f2937;font-weight:600;\">' + esc(r.nombre) + '</td>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:center;color:' + color + ';font-weight:700;\">' + estado + '</td>'\n    + '<td style=\"padding:9px 12px;border-bottom:1px solid #e8e8f0;text-align:center;color:#6b7280;\">' + min + '</td>'\n    + '</tr>';\n}\nconst n = rows.length;\nconst html = '<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body style=\"margin:0;padding:0;background:#f3f4f6;font-family:Helvetica,Arial,sans-serif;\">'\n  + '<div style=\"max-width:600px;margin:24px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;\">'\n  + '<div style=\"background:linear-gradient(135deg,#111827,#1f2937);padding:24px 28px;\">'\n  + '<div style=\"font-size:22px;font-weight:800;letter-spacing:1px;color:#fbbf24;\">PIXELVAULT</div>'\n  + '<div style=\"font-size:12px;color:#9ca3af;margin-top:4px;letter-spacing:2px;text-transform:uppercase;\">Alerta de stock</div>'\n  + '</div>'\n  + '<div style=\"padding:24px 28px;\">'\n  + '<p style=\"margin:0 0 6px;font-size:16px;color:#111827;\">Hola admin,</p>'\n  + '<p style=\"margin:0 0 16px;font-size:14px;color:#6b7280;\">Estos ' + n + ' producto(s) llegaron a su minimo de stock y conviene reponer:</p>'\n  + '<table style=\"width:100%;border-collapse:collapse;font-size:14px;\">'\n  + '<tr style=\"background:#f9fafb;\"><th style=\"padding:9px 12px;text-align:left;color:#6b7280;font-size:11px;text-transform:uppercase;\">Producto</th><th style=\"padding:9px 12px;text-align:center;color:#6b7280;font-size:11px;text-transform:uppercase;\">Stock</th><th style=\"padding:9px 12px;text-align:center;color:#6b7280;font-size:11px;text-transform:uppercase;\">Minimo</th></tr>'\n  + filas\n  + '</table>'\n  + '</div>'\n  + '<div style=\"padding:14px 28px;background:#f9fafb;font-size:11px;color:#9ca3af;text-align:center;\">PIXELVAULT - Correo automatico, no responder.</div>'\n  + '</div></body></html>';\nreturn [{ json: { subject: 'PIXELVAULT - ' + n + ' producto(s) con stock bajo', admin_html: html, cuantos: n } }];"
+      },
+      "id": "c7000000-0000-4000-8000-000000000004",
+      "name": "Armar aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "PIXELVAULT <javierandresn12@gmail.com>",
+        "toEmail": "javierandresn12@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.admin_html }}",
+        "options": {}
+      },
+      "id": "c7000000-0000-4000-8000-000000000005",
+      "name": "Aviso admin",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        180
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "VD__02d6_c6RVQtE",
+          "name": "PixelVault SMTP"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE producto SET alerta_stock_enviada = 1 WHERE cantidad <= stock_minimo AND alerta_stock_enviada = 0;",
+        "options": {}
+      },
+      "id": "c7000000-0000-4000-8000-000000000006",
+      "name": "Marcar avisado",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        440,
+        420
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "IUUsntleokpYshPu",
+          "name": "PixelVault MySQL"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "content": "PIXELVAULT - Alerta de Stock Bajo\n\nOjo: este workflow SOLO avisa al admin cuando un producto queda por debajo de su minimo. No manda nada al cliente.\n\nSe ejecuta solo cada 30 s (no depende de PHP).\n\nPasos:\n  1) Reponer: si un producto ya se repuso (cantidad > stock_minimo), lo vuelve a \"armar\" (alerta_stock_enviada = 0).\n  2) Stock bajo: busca productos con cantidad <= stock_minimo y aun sin avisar.\n     - Si no hay ninguno, el flujo se detiene (no manda correo).\n  3) Armar aviso: arma el texto/HTML del correo con la lista de productos.\n  4) Aviso admin: envia el correo al admin (con reintentos).\n  5) Marcar avisado: marca esos productos con alerta_stock_enviada = 1.\n\nGracias al paso 5 no repite el correo en cada ejecucion; gracias al paso 1, si el producto vuelve a bajar, avisa otra vez.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "c7000000-0000-4000-8000-000000000007",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Reponer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reponer": {
+      "main": [
+        [
+          {
+            "node": "Stock bajo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stock bajo": {
+      "main": [
+        [
+          {
+            "node": "Armar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar aviso": {
+      "main": [
+        [
+          {
+            "node": "Aviso admin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Marcar avisado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}

@@ -54,6 +54,7 @@ CREATE TABLE producto (
   imagen VARCHAR(500) DEFAULT NULL,
   cantidad INT NOT NULL DEFAULT 0,
   stock_minimo INT NOT NULL DEFAULT 5,
+  alerta_stock_enviada TINYINT(1) NOT NULL DEFAULT 0,
   estado ENUM('activo','inactivo') NOT NULL DEFAULT 'activo',
   creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_producto_categoria FOREIGN KEY (categoria_id)
