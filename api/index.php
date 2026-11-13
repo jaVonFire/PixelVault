@@ -133,6 +133,19 @@ switch ($action) {
         chat_mensaje();
         break;
 
+    /* =========== VISION DE PRODUCTOS (PHP + Gemini, sin n8n) =========== */
+    case 'vision_analizar':
+        if ($method !== 'POST') json_error('Metodo no permitido', 405);
+        require_once __DIR__ . '/controllers/vision.php';
+        vision_analizar();
+        break;
+
+    case 'vision_confirmar':
+        if ($method !== 'POST') json_error('Metodo no permitido', 405);
+        require_once __DIR__ . '/controllers/vision.php';
+        vision_confirmar();
+        break;
+
     /* =========== AUTOMATIZACIONES NATIVAS (solo admin) =========== */
     case 'automatizaciones':
         if ($method !== 'GET') json_error('Metodo no permitido', 405);

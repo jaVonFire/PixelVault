@@ -352,6 +352,28 @@ body.has-notif .cart-window{bottom:248px;max-height:calc(100vh - 280px);}
 .chat-input-area{border-top:2px solid var(--border);padding:10px;display:flex;gap:8px;background:var(--card);flex-shrink:0;}
 .chat-input{flex:1;background:var(--bg);border:2px solid var(--border);color:var(--txt-l);padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:13px;}
 .chat-input:focus{outline:none;border-color:var(--blue);}
+.chat-vision-button{background:var(--bg);border:2px solid var(--border);color:var(--blue-g);padding:8px 11px;cursor:pointer;}
+.chat-vision-button:hover{border-color:var(--blue);}
+.chat-vision-preview{padding:10px 12px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
+.chat-vision-preview[hidden]{display:none;}
+.chat-vision-preview-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.chat-vision-preview-row img{width:70px;height:58px;object-fit:cover;border:1px solid var(--border);background:var(--bg);}
+.chat-vision-preview-copy,.chat-vision-consent{font-size:10px;line-height:1.5;color:var(--txt-d);}
+.chat-vision-consent{display:flex;align-items:flex-start;gap:7px;cursor:pointer;}
+.chat-vision-consent input{margin-top:2px;accent-color:var(--blue);}
+.chat-vision-preview-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;}
+.chat-vision-preview-actions button,.chat-vision-add{border:1px solid var(--blue);background:var(--blue-d);color:#fff;padding:6px 9px;font-size:10px;cursor:pointer;}
+.chat-vision-preview-actions .chat-vision-cancel{background:transparent;border-color:var(--border);color:var(--txt-d);}
+.chat-vision-preview-actions button:disabled,.chat-vision-add:disabled{opacity:.5;cursor:not-allowed;}
+.chat-msg.chat-vision-result{max-width:94%;}
+.chat-vision-result>p{margin:6px 0;font-size:11px;}
+.chat-vision-product{margin-top:8px;padding:8px;border:1px solid var(--border);background:var(--bg2);}
+.chat-vision-product strong{font-size:11px;color:var(--blue-g);}
+.chat-vision-product p{font-size:10px;margin:4px 0;color:var(--txt-d);}
+.chat-vision-product small{display:block;font-size:9px;color:var(--txt-d);margin:4px 0;}
+.chat-vision-product .chat-vision-add{margin-top:4px;}
+.chat-vision-low-confidence{color:var(--gold);font-size:10px;}
+.chat-vision-admin-note{color:var(--gold)!important;}
 .chat-send{background:var(--blue-d);border:2px solid var(--blue);color:#fff;padding:8px 14px;cursor:pointer;font-size:14px;}
 .chat-send:hover{background:var(--blue);}
 

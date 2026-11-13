@@ -10,6 +10,222 @@ var chatInputEl = document.getElementById('chatInput');
 var chatMessagesEl = document.getElementById('chatMessages');
 var chatBadgeEl = document.getElementById('chatBadge');
 var ratingAreaEl = document.getElementById('ratingArea');
+var visionImageBlob = null, visionPreviewUrl = null, visionBusy = false;
+
+function initChatVisionControls() {
+  var inputArea = chatInputEl.parentNode;
+  var fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/jpeg,image/png,image/webp';
+  fileInput.style.display = 'none';
+  fileInput.setAttribute('aria-label', t('chat_vision_button'));
+
+  var button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'chat-vision-button';
+  button.innerHTML = '<i class="fas fa-camera"></i>';
+  button.title = t('chat_vision_button');
+  button.setAttribute('aria-label', t('chat_vision_button'));
+  button.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!currentUser) { showToast(t('chat_vision_login'), 'error'); return; }
+    fileInput.click();
+  });
+  inputArea.insertBefore(button, chatInputEl);
+  inputArea.appendChild(fileInput);
+
+  var panel = document.createElement('div');
+  panel.className = 'chat-vision-preview';
+  panel.hidden = true;
+  panel.innerHTML = '<div class="chat-vision-preview-row"><img alt=""><div class="chat-vision-preview-copy"></div></div>' +
+    '<label class="chat-vision-consent"><input type="checkbox"><span></span></label>' +
+    '<div class="chat-vision-preview-actions"><button type="button" class="chat-vision-cancel"></button><button type="button" class="chat-vision-analyze" disabled></button></div>';
+  panel.querySelector('.chat-vision-preview-copy').textContent = t('chat_vision_selected');
+  panel.querySelector('.chat-vision-consent span').textContent = t('chat_vision_consent');
+  panel.querySelector('.chat-vision-cancel').textContent = t('cancel');
+  panel.querySelector('.chat-vision-analyze').textContent = t('chat_vision_analyze');
+  chatWindowEl.insertBefore(panel, inputArea);
+
+  var consent = panel.querySelector('.chat-vision-consent input');
+  var analyze = panel.querySelector('.chat-vision-analyze');
+  consent.addEventListener('change', function () { analyze.disabled = !consent.checked || !visionImageBlob || visionBusy; });
+  panel.querySelector('.chat-vision-cancel').addEventListener('click', clearChatVisionSelection);
+  analyze.addEventListener('click', submitChatVisionImage);
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    if (!file) return;
+    clearChatVisionSelection();
+    if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || file.size > 15728640) {
+      showToast(t('chat_vision_bad_file'), 'error');
+      return;
+    }
+    compressChatVisionImage(file).then(function (blob) {
+      visionImageBlob = blob;
+      if (visionPreviewUrl) URL.revokeObjectURL(visionPreviewUrl);
+      visionPreviewUrl = URL.createObjectURL(blob);
+      panel.querySelector('img').src = visionPreviewUrl;
+      panel.hidden = false;
+      consent.checked = false;
+      analyze.disabled = true;
+    }).catch(function () {
+      visionImageBlob = null;
+      showToast(t('chat_vision_bad_file'), 'error');
+    });
+  });
+}
+
+function compressChatVisionImage(file) {
+  return new Promise(function (resolve, reject) {
+    var objectUrl = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var width = img.naturalWidth, height = img.naturalHeight;
+      URL.revokeObjectURL(objectUrl);
+      if (!width || !height || width * height > 40000000) { reject(new Error('invalid_image')); return; }
+      var scale = Math.min(1, 1280 / Math.max(width, height));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      var ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('canvas_unavailable')); return; }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var qualities = [0.82, 0.68, 0.54];
+      function encode(index) {
+        if (index >= qualities.length) {
+          if (Math.max(canvas.width, canvas.height) <= 640) { reject(new Error('too_large')); return; }
+          canvas.width = Math.max(1, Math.round(canvas.width * 0.8));
+          canvas.height = Math.max(1, Math.round(canvas.height * 0.8));
+          ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          encode(0);
+          return;
+        }
+        canvas.toBlob(function (blob) {
+          if (!blob) { reject(new Error('encode_failed')); return; }
+          if (blob.size > 1700000) { encode(index + 1); return; }
+          resolve(blob);
+        }, 'image/jpeg', qualities[index]);
+      }
+      encode(0);
+    };
+    img.onerror = function () { URL.revokeObjectURL(objectUrl); reject(new Error('invalid_image')); };
+    img.src = objectUrl;
+  });
+}
+
+function clearChatVisionSelection() {
+  visionImageBlob = null;
+  if (visionPreviewUrl) URL.revokeObjectURL(visionPreviewUrl);
+  visionPreviewUrl = null;
+  var panel = chatWindowEl.querySelector('.chat-vision-preview');
+  if (!panel) return;
+  panel.hidden = true;
+  panel.querySelector('img').removeAttribute('src');
+  panel.querySelector('.chat-vision-consent input').checked = false;
+  panel.querySelector('.chat-vision-analyze').disabled = true;
+}
+
+function submitChatVisionImage() {
+  var panel = chatWindowEl.querySelector('.chat-vision-preview');
+  if (!currentUser) { showToast(t('chat_vision_login'), 'error'); return; }
+  if (!visionImageBlob || !panel.querySelector('.chat-vision-consent input').checked || visionBusy) return;
+  visionBusy = true;
+  panel.querySelector('.chat-vision-analyze').disabled = true;
+  addUserMessage(t('chat_vision_user_message'));
+  showTyping();
+  var form = new FormData();
+  form.append('image', visionImageBlob, 'product-photo.jpg');
+  form.append('privacy_consent', '1');
+  form.append('lang', currentLang());
+  apiUpload('vision_analizar', form).then(function (result) {
+    hideTyping();
+    addChatVisionResult(result);
+    clearChatVisionSelection();
+  }).catch(function (error) {
+    hideTyping();
+    addBotMessage(error.message || t('chat_vision_error'));
+    panel.querySelector('.chat-vision-analyze').disabled = !panel.querySelector('.chat-vision-consent input').checked;
+  }).then(function () { visionBusy = false; });
+}
+
+function addChatVisionResult(result) {
+  var div = document.createElement('div');
+  div.className = 'chat-msg bot chat-vision-result';
+  var title = document.createElement('strong');
+  title.textContent = t('chat_vision_result_title');
+  div.appendChild(title);
+  if (result.description) {
+    var description = document.createElement('p');
+    description.textContent = result.description;
+    div.appendChild(description);
+  }
+  if (!result.candidates || !result.candidates.length) {
+    var none = document.createElement('p');
+    none.textContent = t('chat_vision_no_match');
+    div.appendChild(none);
+  } else {
+    if (result.low_confidence) {
+      var note = document.createElement('p');
+      note.className = 'chat-vision-low-confidence';
+      note.textContent = t('chat_vision_low_confidence');
+      div.appendChild(note);
+    }
+    result.candidates.forEach(function (product) {
+      var card = document.createElement('div');
+      card.className = 'chat-vision-product';
+      var name = document.createElement('strong');
+      name.textContent = product.nombre;
+      card.appendChild(name);
+      var details = document.createElement('p');
+      details.textContent = product.categoria + ' · USD ' + Number(product.precio).toFixed(2) + ' · ' + t('chat_vision_stock') + ': ' + Number(product.stock);
+      card.appendChild(details);
+      var confidence = document.createElement('small');
+      confidence.textContent = t('chat_vision_confidence') + ': ' + Math.round(Number(product.confidence) * 100) + '%';
+      card.appendChild(confidence);
+
+      if (currentUser && currentUser.rol === 'cliente') {
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'chat-vision-add';
+        add.textContent = Number(product.stock) > 0 ? t('chat_vision_add') : t('chat_vision_out_of_stock');
+        add.disabled = Number(product.stock) < 1;
+        add.addEventListener('click', function () {
+          add.disabled = true;
+          apiSend('POST', 'vision_confirmar', { vision_id: Number(result.id), producto_id: Number(product.product_id) })
+            .then(function () {
+              add.textContent = t('chat_vision_added');
+              if (typeof refreshCart === 'function') refreshCart();
+              showToast(t('chat_vision_added'), 'success');
+            })
+            .catch(function (error) {
+              add.disabled = Number(product.stock) < 1;
+              showToast(error.message || t('chat_vision_add_error'), 'error');
+            });
+        });
+        card.appendChild(add);
+      } else {
+        var adminNote = document.createElement('small');
+        adminNote.className = 'chat-vision-admin-note';
+        adminNote.textContent = t('chat_vision_admin_note');
+        card.appendChild(adminNote);
+      }
+      div.appendChild(card);
+    });
+  }
+  var time = document.createElement('span');
+  time.className = 'time';
+  time.textContent = new Date().toLocaleTimeString(currentLang() === 'es' ? 'es' : 'en', { hour: '2-digit', minute: '2-digit' });
+  div.appendChild(time);
+  chatMessagesEl.appendChild(div);
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+initChatVisionControls();
 
 function openChat() {
   if (cartOpen) closeCart();

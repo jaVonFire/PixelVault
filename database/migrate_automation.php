@@ -50,6 +50,30 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS chat_log (
     KEY idx_chat_fecha (creado_el)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+$pdo->exec("CREATE TABLE IF NOT EXISTS vision_solicitud (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    archivo_ruta VARCHAR(80) DEFAULT NULL,
+    sha256 CHAR(64) NOT NULL,
+    estado ENUM('procesando','coincidencia','sin_coincidencia','error','agregado') NOT NULL DEFAULT 'procesando',
+    descripcion VARCHAR(500) DEFAULT NULL,
+    confianza DECIMAL(6,5) DEFAULT NULL,
+    resultado_json LONGTEXT DEFAULT NULL,
+    modelo VARCHAR(100) DEFAULT NULL,
+    error_codigo VARCHAR(50) DEFAULT NULL,
+    producto_confirmado_id INT DEFAULT NULL,
+    consentido_el DATETIME NOT NULL,
+    creado_el DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finalizado_el DATETIME DEFAULT NULL,
+    confirmado_el DATETIME DEFAULT NULL,
+    KEY idx_vision_usuario_fecha (usuario_id, creado_el),
+    KEY idx_vision_estado_fecha (estado, creado_el),
+    CONSTRAINT fk_vision_usuario FOREIGN KEY (usuario_id)
+      REFERENCES usuario(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_vision_producto FOREIGN KEY (producto_confirmado_id)
+      REFERENCES producto(id) ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 $pdo->exec("CREATE TABLE IF NOT EXISTS notificacion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,

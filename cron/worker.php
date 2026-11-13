@@ -7,6 +7,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../api/config/db.php';
 require_once __DIR__ . '/../api/services/scheduled_automations.php';
+require_once __DIR__ . '/../api/services/product_vision.php';
 
 $once = in_array('--once', isset($argv) ? $argv : array(), true);
 $pdo = db();
@@ -47,6 +48,7 @@ try {
 
         if ($now >= $nextScheduled['prune']) {
             automation_prune_logs();
+            vision_purge_expired_images($pdo);
             $nextScheduled['prune'] = $now + 86400;
         }
         if ($once) break;

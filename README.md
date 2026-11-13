@@ -45,6 +45,14 @@ Lee la conexión desde las variables del sistema o desde `.env`. La migración a
 
 Define `GEMINI_API_KEY` en `.env` con una clave de Google AI Studio y, si hace falta, cambia `GEMINI_MODEL`. El backend PHP se comunica directamente con Gemini, valida el tema, agrega datos actuales del catálogo y guarda el historial en `chat_log`. Sin clave o si falla la consulta, ofrece reglas conocidas o coincidencias reales del catálogo; para las demás preguntas explica que no puede verificarlas en lugar de inventar una respuesta.
 
+### Visión de productos desde el chatbot
+
+El botón de cámara del chatbot permite a un usuario con sesión enviar una foto del producto. El navegador la reescala y convierte a JPEG para quitar metadatos de la imagen, con un tamaño final inferior a 1.8 MB; antes de subirla se exige consentimiento explícito porque el análisis usa la clave y el modelo Gemini ya configurados. No deben enviarse fotos de personas, documentos ni datos personales. La solicitud se guarda en `vision_solicitud`, asociada al usuario, fecha y hash de la imagen; el archivo queda en `storage/vision`, protegido por Apache, y el worker elimina la foto a los 30 días conservando la auditoría.
+
+Gemini solo puede proponer hasta tres IDs del catálogo activo y la respuesta se limita a un esquema JSON. El servidor descarta IDs ajenos al catálogo, no muestra candidatos con confianza inferior al 45 % y carga nombre, precio y stock desde MySQL. El cliente revisa las coincidencias y confirma cuál agregar; la operación vuelve a validar el producto y el stock dentro de una transacción. Una confianza inferior al 75 % se marca como baja. Los errores temporales del proveedor se reintentan con espera y se explican por separado de una foto que no coincide con el catálogo. El análisis no agrega nada automáticamente ni usa n8n.
+
+En una base existente, ejecuta `database/migrate_automation.php` después de actualizar el proyecto para crear `vision_solicitud`. Para la entrega académica, documenta al menos 20 fotos reales de productos con distintos ángulos e iluminación, cuántas identificó correctamente y qué productos confundió. El uso de Gemini depende de los límites gratuitos disponibles para la clave; no habilites facturación para este proyecto.
+
 ### Correos
 
 La aplicación y el worker conservan los correos en `automatizacion_correo` hasta habilitar el envío:

@@ -14,6 +14,24 @@ function apiSend(method, action, body, params) {
   return apiRequest(method, action, body, params);
 }
 
+/* Envia archivos sin fijar Content-Type para que el navegador agregue el boundary. */
+function apiUpload(action, formData, params) {
+  var url = API_BASE + '?action=' + encodeURIComponent(action);
+  if (params) {
+    Object.keys(params).forEach(function (k) {
+      if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
+        url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+      }
+    });
+  }
+  return fetch(url, { method: 'POST', credentials: 'same-origin', body: formData }).then(function (res) {
+    return res.json().then(function (data) {
+      if (!res.ok) throw new Error(data.error || 'Error del servidor');
+      return data;
+    });
+  });
+}
+
 function apiRequest(method, action, body, params) {
   var url = API_BASE + '?action=' + encodeURIComponent(action);
   if (params) {

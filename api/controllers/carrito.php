@@ -41,35 +41,48 @@ function carrito_add() {
     if ($producto_id <= 0 || $cantidad < 1) json_error('Datos de producto invalidos');
 
     $pdo = db();
-
-    $stmt = $pdo->prepare('SELECT id, cantidad, estado FROM producto WHERE id=?');
-    $stmt->execute(array($producto_id));
-    $prod = $stmt->fetch();
-    if (!$prod) json_error('Producto no encontrado', 404);
-    if ($prod['estado'] !== 'activo') json_error('Producto no disponible');
-
-    /* Cuanto hay ya en el carrito de este producto */
-    $stmt = $pdo->prepare('SELECT cantidad FROM carrito WHERE usuario_id=? AND producto_id=?');
-    $stmt->execute(array($uid, $producto_id));
-    $existente = $stmt->fetch();
-    $enCarrito = $existente ? (int)$existente['cantidad'] : 0;
-
-    $nueva = $enCarrito + $cantidad;
-
-    /* Revisa inventario disponible */
-    if ($nueva > (int)$prod['cantidad']) {
-        json_error('Stock insuficiente: solo hay ' . $prod['cantidad'] . ' unidades');
-    }
-
-    if ($existente) {
-        $stmt = $pdo->prepare('UPDATE carrito SET cantidad=? WHERE usuario_id=? AND producto_id=?');
-        $stmt->execute(array($nueva, $uid, $producto_id));
-    } else {
-        $stmt = $pdo->prepare('INSERT INTO carrito (usuario_id, producto_id, cantidad) VALUES (?,?,?)');
-        $stmt->execute(array($uid, $producto_id, $cantidad));
+    $pdo->beginTransaction();
+    try {
+        $result = carrito_agregar_producto($pdo, $uid, $producto_id, $cantidad);
+        if (!$result['ok']) {
+            $pdo->rollBack();
+            json_error($result['error'], $result['code']);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('PixelVault cart add failed: ' . $e->getMessage());
+        json_error('No se pudo agregar el producto al carrito', 500);
     }
 
     json_ok(array('message' => 'Producto agregado al carrito'));
+}
+
+/* Helper transaccional compartido por el carrito y la confirmacion desde vision. */
+function carrito_agregar_producto($pdo, $uid, $producto_id, $cantidad) {
+    $stmt = $pdo->prepare('SELECT id, cantidad, estado FROM producto WHERE id=? FOR UPDATE');
+    $stmt->execute(array((int)$producto_id));
+    $prod = $stmt->fetch();
+    if (!$prod) return array('ok' => false, 'code' => 404, 'error' => 'Producto no encontrado');
+    if ($prod['estado'] !== 'activo') return array('ok' => false, 'code' => 400, 'error' => 'Producto no disponible');
+
+    $stmt = $pdo->prepare('SELECT cantidad FROM carrito WHERE usuario_id=? AND producto_id=? FOR UPDATE');
+    $stmt->execute(array((int)$uid, (int)$producto_id));
+    $existente = $stmt->fetch();
+    $enCarrito = $existente ? (int)$existente['cantidad'] : 0;
+    $nueva = $enCarrito + (int)$cantidad;
+
+    if ($nueva > (int)$prod['cantidad']) {
+        return array('ok' => false, 'code' => 409, 'error' => 'Stock insuficiente: solo hay ' . (int)$prod['cantidad'] . ' unidades');
+    }
+    if ($existente) {
+        $stmt = $pdo->prepare('UPDATE carrito SET cantidad=? WHERE usuario_id=? AND producto_id=?');
+        $stmt->execute(array($nueva, (int)$uid, (int)$producto_id));
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO carrito (usuario_id, producto_id, cantidad) VALUES (?,?,?)');
+        $stmt->execute(array((int)$uid, (int)$producto_id, (int)$cantidad));
+    }
+    return array('ok' => true, 'code' => 200, 'error' => null);
 }
 
 /* Modificar cantidad de un item del carrito */
