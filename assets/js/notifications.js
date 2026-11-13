@@ -1,8 +1,7 @@
 /* ============================================================
    NOTIFICACIONES - Recordatorios de carrito (campanita)
-   Las notificaciones las CREA el workflow de n8n
-   "PixelVault - Recordatorio Carrito" (Schedule cada minuto) que
-   escribe en la tabla `notificacion`. Este modulo:
+   Las notificaciones las CREA el worker PHP en la tabla `notificacion`.
+   Este modulo:
      - las lee desde la API (?action=notificaciones),
      - muestra la campanita con el contador de no leidas,
      - hace sonar una campanita (Web Audio) cuando llega una nueva,
@@ -17,7 +16,7 @@ var notifTimer = null;
 var notifLastUnread = 0;
 var notifFirstLoad = true;
 var notifAudioCtx = null;
-var notifPollMs = 10000;
+var notifPollMs = 5000;
 
 function notifEl(id) { return document.getElementById(id); }
 

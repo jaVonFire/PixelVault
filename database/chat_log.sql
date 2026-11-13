@@ -1,6 +1,7 @@
 -- ============================================================
 --  PIXELVAULT - Migracion: tabla chat_log
 --  Para bases de datos YA creadas (no borra datos).
+--  Referencia anterior al instalador idempotente `migrate_automation.php`.
 --  Ejecutar en phpMyAdmin o: mysql -u root pixelvault < chat_log.sql
 -- ============================================================
 USE pixelvault;
@@ -12,7 +13,7 @@ CREATE TABLE IF NOT EXISTS chat_log (
   lang CHAR(2) NOT NULL DEFAULT 'es',
   mensaje VARCHAR(500) NOT NULL,
   reply TEXT,
-  fuente VARCHAR(20) NOT NULL DEFAULT 'n8n',
+  fuente VARCHAR(20) NOT NULL DEFAULT 'gemini',
   creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_chat_sesion (sesion),
   KEY idx_chat_fecha (creado_el)

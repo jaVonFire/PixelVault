@@ -1,12 +1,14 @@
 -- ============================================================
 --  PIXELVAULT - Migracion: recordatorios de carrito + notificaciones
 --  Para bases de datos YA creadas (no borra datos).
---  Ejecutar en phpMyAdmin o: mysql -u root pixelvault < migracion_recordatorios.sql
+--  LEGACY: para una base existente, usa `php database/migrate_automation.php`.
+--  Ese instalador es idempotente y prepara tambien la cola del worker PHP.
+--  Conservado como referencia histórica; no lo ejecutes directamente.
 --
 --  Que hace:
 --   1) Agrega carrito.agregado_el  -> marca de tiempo de la ultima
 --      actividad en el carrito (sirve para medir el "1 minuto").
---   2) Crea la tabla notificacion  -> avisos del n8n para el usuario
+--   2) Crea la tabla notificacion  -> avisos del worker para el usuario
 --      (campanita con contador de no leidas).
 -- ============================================================
 USE pixelvault;

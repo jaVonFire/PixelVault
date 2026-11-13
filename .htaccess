@@ -9,3 +9,8 @@
     Header set Expires "0"
   </FilesMatch>
 </IfModule>
+
+# El archivo local de variables contiene credenciales y nunca debe servirse.
+<FilesMatch "^\.env(?:\..*)?$">
+  Require all denied
+</FilesMatch>

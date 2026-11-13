@@ -105,5 +105,7 @@ function carrito_remove() {
 
     $stmt = db()->prepare('DELETE FROM carrito WHERE usuario_id=? AND producto_id=?');
     $stmt->execute(array($uid, $producto_id));
+    /* Quitar un item también reinicia el tiempo de inactividad del carrito restante. */
+    db()->prepare('UPDATE carrito SET agregado_el=CURRENT_TIMESTAMP WHERE usuario_id=?')->execute(array($uid));
     json_ok(array('message' => 'Producto eliminado del carrito'));
 }

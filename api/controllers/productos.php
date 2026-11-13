@@ -81,8 +81,11 @@ function productos_create() {
     $stmt = db()->prepare('INSERT INTO producto (nombre, descripcion, categoria_id, precio, imagen, cantidad, stock_minimo, estado)
                            VALUES (?,?,?,?,?,?,?,?)');
     $stmt->execute(array($nombre, $descripcion, $categoria_id, $precio, $imagen, $cantidad, $stock_minimo, $estado));
+    $newId = (int)db()->lastInsertId();
 
-    json_ok(array('id' => (int)db()->lastInsertId(), 'message' => 'Producto creado'), 201);
+    productos_disparar_alerta_stock();
+
+    json_ok(array('id' => $newId, 'message' => 'Producto creado'), 201);
 }
 
 function productos_update() {
@@ -113,9 +116,10 @@ function productos_update() {
 
     $stmt = db()->prepare('UPDATE producto
                            SET nombre=?, descripcion=?, categoria_id=?, precio=?, imagen=?,
-                               cantidad=?, stock_minimo=?, estado=?
+                               cantidad=?, stock_minimo=?, estado=?,
+                               alerta_stock_enviada=IF(? > ?, 0, alerta_stock_enviada)
                            WHERE id=?');
-    $stmt->execute(array($nombre, $descripcion, $categoria_id, $precio, $imagen, $cantidad, $stock_minimo, $estado, $id));
+    $stmt->execute(array($nombre, $descripcion, $categoria_id, $precio, $imagen, $cantidad, $stock_minimo, $estado, $cantidad, $stock_minimo, $id));
 
     if ($stmt->rowCount() === 0) {
         /* verificar que exista el producto */
@@ -123,7 +127,18 @@ function productos_update() {
         $chk->execute(array($id));
         if (!$chk->fetch()) json_error('Producto no encontrado', 404);
     }
+    productos_disparar_alerta_stock();
     json_ok(array('message' => 'Producto actualizado'));
+}
+
+function productos_disparar_alerta_stock() {
+    try {
+        require_once __DIR__ . '/../services/scheduled_automations.php';
+        automation_run_low_stock();
+        automation_run_email_queue();
+    } catch (Throwable $e) {
+        error_log('PixelVault low-stock trigger failed: ' . $e->getMessage());
+    }
 }
 
 function productos_delete() {
@@ -147,7 +162,9 @@ function productos_delete() {
 /* Productos con inventario bajo (alerta) */
 function productos_alertas() {
     require_admin();
-    $stmt = db()->query('SELECT id, nombre, cantidad, stock_minimo FROM producto
-                         WHERE estado="activo" AND cantidad <= stock_minimo ORDER BY cantidad');
+    $cfg = require __DIR__ . '/../config/automation_config.php';
+    $stmt = db()->prepare('SELECT id, nombre, cantidad, stock_minimo FROM producto
+                           WHERE estado="activo" AND cantidad <= ? ORDER BY cantidad');
+    $stmt->execute(array((int)$cfg['stock_alert_threshold']));
     json_ok(array('alertas' => $stmt->fetchAll()));
 }

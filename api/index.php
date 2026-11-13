@@ -126,11 +126,24 @@ switch ($action) {
         chatlog_index();
         break;
 
-    /* =========== CHATBOT IA (proxy hacia n8n) =========== */
+    /* =========== CHATBOT IA (backend PHP + Gemini) =========== */
     case 'chat':
         if ($method !== 'POST') json_error('Metodo no permitido', 405);
         require_once __DIR__ . '/controllers/chat.php';
         chat_mensaje();
+        break;
+
+    /* =========== AUTOMATIZACIONES NATIVAS (solo admin) =========== */
+    case 'automatizaciones':
+        if ($method !== 'GET') json_error('Metodo no permitido', 405);
+        require_once __DIR__ . '/controllers/admin.php';
+        automatizaciones_index();
+        break;
+
+    case 'automatizacion_reintentar':
+        if ($method !== 'POST') json_error('Metodo no permitido', 405);
+        require_once __DIR__ . '/controllers/admin.php';
+        automatizacion_correo_reintentar();
         break;
 
     /* =========== NOTIFICACIONES (recordatorios de carrito) =========== */

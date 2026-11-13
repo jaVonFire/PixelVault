@@ -25,7 +25,7 @@ function current_user() {
     }
     $stmt = db()->prepare('SELECT id, username, displayname, email, rol, pais, edad,
                                   plataforma, juego_favorito, telefono, direccion, moneda,
-                                  metodo_pago, creado_el
+                                  metodo_pago, puntos, nivel, creado_el
                            FROM usuario WHERE id = ?');
     $stmt->execute(array($_SESSION['user_id']));
     $user = $stmt->fetch();

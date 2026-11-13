@@ -29,6 +29,8 @@ CREATE TABLE usuario (
   direccion VARCHAR(255) DEFAULT NULL,
   moneda CHAR(3) NOT NULL DEFAULT 'USD',
   metodo_pago VARCHAR(40) DEFAULT NULL,
+  puntos INT NOT NULL DEFAULT 0,
+  nivel VARCHAR(20) NOT NULL DEFAULT 'nuevo',
   creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -72,6 +74,8 @@ CREATE TABLE pedido (
   total DECIMAL(10,2) NOT NULL,
   estado ENUM('pendiente','procesando','enviado','entregado','cancelado')
     NOT NULL DEFAULT 'pendiente',
+  facturado_el DATETIME DEFAULT NULL,
+  resena_enviada TINYINT(1) NOT NULL DEFAULT 0,
   creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_pedido_usuario FOREIGN KEY (usuario_id)
     REFERENCES usuario(id) ON UPDATE CASCADE ON DELETE RESTRICT
@@ -110,11 +114,9 @@ CREATE TABLE carrito (
 ) ENGINE=InnoDB;
 
 -- ============================================================
---  7. CHAT_LOG  (bitacora del chatbot IA orquestado por n8n)
---  La escribe el n8n (nodo MySQL) en cada intercambio y
---  ademas le sirve de memoria conversacional a la IA.
+--  7. CHAT_LOG (memoria y bitacora del chatbot nativo en PHP)
 --  sesion: identificador anonimo que envia api/controllers/chat.php
---  fuente: 'n8n' (respondio la IA) | 'guardarrail' | 'respaldo'
+--  fuente: 'gemini' | 'guardarrail' | 'respaldo' | 'local'
 -- ============================================================
 CREATE TABLE chat_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -123,15 +125,15 @@ CREATE TABLE chat_log (
   lang CHAR(2) NOT NULL DEFAULT 'es',
   mensaje VARCHAR(500) NOT NULL,
   reply TEXT,
-  fuente VARCHAR(20) NOT NULL DEFAULT 'n8n',
+  fuente VARCHAR(20) NOT NULL DEFAULT 'gemini',
   creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_chat_sesion (sesion),
   KEY idx_chat_fecha (creado_el)
 ) ENGINE=InnoDB;
 
 -- ============================================================
---  8. NOTIFICACION  (avisos generados por n8n para el usuario)
---  Las escribe el n8n (workflow "Recordatorio Carrito") cuando un
+--  8. NOTIFICACION (avisos generados por el worker PHP)
+--  Los escribe el worker cuando un
 --  cliente deja productos sin comprar. El frontend las lee con
 --  api/controllers/notificaciones.php y las muestra en la campanita.
 --  tipo: 'carrito_1' (primer aviso) | 'carrito_2' (recordatorio final)
@@ -149,6 +151,77 @@ CREATE TABLE notificacion (
   KEY idx_notif_fecha (creado_el),
   CONSTRAINT fk_notif_usuario FOREIGN KEY (usuario_id)
     REFERENCES usuario(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ============================================================
+--  9. CUPON Y BITACORA DE POSCOMPRA
+-- ============================================================
+CREATE TABLE cupon (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  codigo VARCHAR(40) NOT NULL UNIQUE,
+  usuario_id INT NOT NULL,
+  pedido_id INT DEFAULT NULL,
+  descuento_pct INT NOT NULL,
+  motivo VARCHAR(60) DEFAULT NULL,
+  estado ENUM('activo','usado','expirado') NOT NULL DEFAULT 'activo',
+  creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expira_el DATETIME DEFAULT NULL,
+  KEY idx_cupon_usuario (usuario_id, estado),
+  CONSTRAINT fk_cupon_usuario FOREIGN KEY (usuario_id)
+    REFERENCES usuario(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE automatizacion_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  pedido_id INT DEFAULT NULL,
+  usuario_id INT DEFAULT NULL,
+  tipo VARCHAR(40) NOT NULL,
+  detalle VARCHAR(255) DEFAULT NULL,
+  creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_autolog_pedido (pedido_id),
+  KEY idx_autolog_fecha (creado_el)
+) ENGINE=InnoDB;
+
+CREATE TABLE automatizacion_configuracion (
+  clave VARCHAR(80) PRIMARY KEY,
+  valor VARCHAR(255) NOT NULL,
+  actualizado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 10. EJECUCIONES Y COLA DE CORREO DEL WORKER NATIVO
+-- ============================================================
+CREATE TABLE automatizacion_ejecucion (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  flujo VARCHAR(40) NOT NULL,
+  estado ENUM('ejecutando','completado','error') NOT NULL DEFAULT 'ejecutando',
+  entrada LONGTEXT DEFAULT NULL,
+  salida LONGTEXT DEFAULT NULL,
+  error TEXT DEFAULT NULL,
+  iniciado_el DATETIME NOT NULL,
+  finalizado_el DATETIME DEFAULT NULL,
+  KEY idx_auto_run_flow_date (flujo, iniciado_el),
+  KEY idx_auto_run_status (estado, iniciado_el)
+) ENGINE=InnoDB;
+
+CREATE TABLE automatizacion_correo (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  flujo VARCHAR(40) NOT NULL,
+  clave_unica VARCHAR(160) NOT NULL UNIQUE,
+  referencia_id INT DEFAULT NULL,
+  destinatario VARCHAR(254) NOT NULL,
+  asunto VARCHAR(255) NOT NULL,
+  html MEDIUMTEXT NOT NULL,
+  estado ENUM('pendiente','enviando','enviado','fallido') NOT NULL DEFAULT 'pendiente',
+  intentos INT NOT NULL DEFAULT 0,
+  disponible_el DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  enviado_el DATETIME DEFAULT NULL,
+  ultimo_error TEXT DEFAULT NULL,
+  creado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  actualizado_el TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_auto_mail_state (estado, disponible_el),
+  KEY idx_auto_mail_ref (flujo, referencia_id),
+  KEY idx_auto_mail_date (creado_el)
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -329,8 +402,8 @@ INSERT INTO producto (nombre, descripcion, categoria_id, precio, imagen, cantida
 ('Replica Espada Master Sword', 'Replica Espada Master Sword. Figura coleccionable detallada, ideal para exhibir en tu vitrina.', 4, 49.99, 'https://wsrv.nl/?url=https://live.staticflickr.com/7035/6463446793_e9f697a60b_b.jpg&w=400&h=300&fit=cover&output=jpg', 100, 5, 'activo');
 
 -- Un pedido de ejemplo para que el panel admin tenga datos que mostrar.
-INSERT INTO pedido (usuario_id, codigo, total, estado, creado_el) VALUES
-(2, 'PV-DEMO0001', 184.97, 'enviado', NOW() - INTERVAL 2 DAY);
+INSERT INTO pedido (usuario_id, codigo, total, estado, facturado_el, resena_enviada, creado_el) VALUES
+(2, 'PV-DEMO0001', 184.97, 'enviado', NOW() - INTERVAL 2 DAY, 1, NOW() - INTERVAL 2 DAY);
 INSERT INTO detalle_pedido (pedido_id, producto_id, nombre_producto, precio, cantidad) VALUES
 (1, 3, 'Figura Funko Pop - Kratos', 24.99, 1),
 (1, 5, 'Headset HyperX Cloud III', 99.99, 1),

@@ -41,6 +41,7 @@ function setupAdmin() {
       if (this.dataset.tab === 'orders') renderAdminOrders();
       if (this.dataset.tab === 'users') renderAdminUsers();
       if (this.dataset.tab === 'chat') renderAdminChat();
+      if (this.dataset.tab === 'automation') renderAdminAutomations();
       applyTranslations();
     });
   });
@@ -328,8 +329,8 @@ function deleteUser(id, usernameEnc) {
   });
 }
 
-/* ============ BITACORA DEL CHATBOT IA (la escribe n8n) ============ */
-var CHAT_FUENTE_COLOR = { n8n: 'var(--green)', guardarrail: 'var(--gold)', respaldo: 'var(--red-g)' };
+/* ============ BITACORA DEL CHATBOT IA (backend PHP) ============ */
+var CHAT_FUENTE_COLOR = { gemini: 'var(--green)', n8n: 'var(--txt-d)', guardarrail: 'var(--gold)', respaldo: 'var(--red-g)', local: 'var(--txt-d)' };
 
 function renderAdminChat() {
   var cont = document.getElementById('admin-chat');
@@ -346,7 +347,7 @@ function renderAdminChat() {
         '<b style="width:30px;text-align:right;">' + x.n + '</b></div>';
     }).join('') || '<p style="font-size:11px;color:var(--txt-d);">' + t('admin_no_data') + '</p>';
 
-    var fuentes = ['n8n', 'guardarrail', 'respaldo'].map(function (f) {
+    var fuentes = ['gemini', 'n8n', 'guardarrail', 'respaldo', 'local'].map(function (f) {
       var n = (d.fuentes && d.fuentes[f]) || 0;
       var pct = d.total ? Math.round((n / d.total) * 100) : 0;
       return '<tr><td><span style="color:' + CHAT_FUENTE_COLOR[f] + ';">&#9679;</span> ' + t('chat_fuente_' + f) + '</td>' +
@@ -375,7 +376,7 @@ function renderAdminChat() {
         '<div class="report-section"><h3><i class="fas fa-chart-simple"></i> ' + t('admin_chatlog_7days') + '</h3>' + barras + '</div>' +
         '<div class="report-section"><h3><i class="fas fa-circle-half-stroke"></i> ' + t('admin_chatlog_sources') + '</h3>' +
           '<table class="report-table"><tr><th>' + t('admin_chatlog_source') + '</th><th>#</th><th>%</th></tr>' + fuentes + '</table>' +
-          '<p style="font-size:9px;color:var(--txt-d);margin-top:10px;">n8n = ' + t('chat_fuente_n8n') +
+          '<p style="font-size:9px;color:var(--txt-d);margin-top:10px;">' + t('chat_fuente_gemini') +
           ' | ' + t('chat_fuente_guardarrail') + ' | ' + t('chat_fuente_respaldo') + '</p></div>' +
       '</div>' +
       '<div class="report-section" style="margin-top:16px;"><h3><i class="fas fa-clock-rotate-left"></i> ' + t('admin_chatlog_last') + '</h3>' +
@@ -387,5 +388,69 @@ function renderAdminChat() {
       '</div>';
   }).catch(function (err) {
     cont.innerHTML = '<p style="color:var(--red-g);">' + err.message + '</p>';
+  });
+}
+
+/* ============ AUTOMATIZACIONES NATIVAS ============ */
+function renderAdminAutomations() {
+  var cont = document.getElementById('admin-automation');
+  if (!cont) return;
+  cont.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>' + t('loading') + '</p></div>';
+  apiGet('automatizaciones').then(function (data) {
+    var stats = data.correo_stats || {};
+    var runs = (data.runs || []).map(function (run) {
+      var summary = run.error || JSON.stringify(run.salida || {});
+      var statusKey = 'admin_auto_status_' + run.estado;
+      return '<tr><td>' + t('admin_auto_flow_' + run.flujo) + '</td>' +
+        '<td>' + (t(statusKey) === statusKey ? escapeHtml(run.estado) : t(statusKey)) + '</td>' +
+        '<td style="white-space:nowrap;">' + escapeHtml(run.iniciado_el || '') + '</td>' +
+        '<td style="max-width:380px;word-break:break-word;">' + escapeHtml(summary) + '</td></tr>';
+    }).join('');
+    var queued = (data.correos || []).map(function (mail) {
+      var error = mail.ultimo_error ? '<div style="color:var(--red-g);font-size:10px;margin-top:4px;">' + escapeHtml(mail.ultimo_error) + '</div>' : '';
+      var retry = mail.estado === 'fallido' ? '<button class="btn-sm" onclick="retryAutomationMail(' + Number(mail.id) + ')"><i class="fas fa-rotate"></i> ' + t('admin_auto_retry') + '</button>' : '';
+      return '<tr><td>' + t('admin_auto_flow_' + mail.flujo) + '</td>' +
+        '<td>' + escapeHtml(mail.estado) + '</td>' +
+        '<td>' + escapeHtml(mail.destinatario) + '</td>' +
+        '<td>' + escapeHtml(mail.asunto) + error + '</td>' +
+        '<td>' + Number(mail.intentos) + '</td><td>' + retry + '</td></tr>';
+    }).join('');
+    var enabled = data.mail_enabled
+      ? '<span style="color:var(--green);">● ' + t('admin_auto_mail_on') + '</span>'
+      : '<span style="color:var(--gold);">● ' + t('admin_auto_mail_off') + '</span>';
+    var adminEmail = data.admin_email_configured
+      ? ''
+      : '<span style="color:var(--gold);display:block;margin-top:5px;">' + t('admin_auto_admin_email_missing') + '</span>';
+    var smtpConfig = data.mail_configured
+      ? ''
+      : '<span style="color:var(--gold);display:block;margin-top:5px;">' + t('admin_auto_mail_config_missing') + '</span>';
+
+    cont.innerHTML = '<h3 style="font-size:13px;color:var(--blue-g);margin-bottom:8px;"><i class="fas fa-gears"></i> ' + t('admin_auto_title') + '</h3>' +
+      '<p style="font-size:11px;color:var(--txt-d);margin-bottom:8px;">' + t('admin_auto_desc') + '</p>' +
+      '<p style="font-size:11px;color:var(--txt-d);margin-bottom:6px;">' + t('admin_auto_admin_email_label') + ': <b>' + escapeHtml(data.admin_email || '') + '</b></p>' +
+      '<p style="font-size:11px;margin-bottom:14px;">' + enabled + ' <span style="color:var(--txt-d);margin-left:8px;">' + t('admin_auto_worker_hint') + '</span>' + adminEmail + smtpConfig + '</p>' +
+      '<div class="dash-cards" style="margin-bottom:16px;">' +
+        dashCard('fa-clock', 'admin_auto_pending', stats.pendiente || 0, 'var(--gold)') +
+        dashCard('fa-spinner', 'admin_auto_sending', stats.enviando || 0, 'var(--blue)') +
+        dashCard('fa-envelope-circle-check', 'admin_auto_sent', stats.enviado || 0, 'var(--green)') +
+        dashCard('fa-circle-exclamation', 'admin_auto_failed', stats.fallido || 0, 'var(--red-g)') +
+      '</div>' +
+      '<div class="report-section"><h3><i class="fas fa-list-check"></i> ' + t('admin_auto_runs') + '</h3>' +
+        (runs ? '<div style="overflow-x:auto;"><table class="report-table"><tr><th>' + t('admin_auto_flow') + '</th><th>' + t('admin_auto_status') + '</th><th>' + t('admin_auto_started') + '</th><th>' + t('admin_auto_summary') + '</th></tr>' + runs + '</table></div>' : '<p style="font-size:11px;color:var(--txt-d);">' + t('admin_auto_no_runs') + '</p>') +
+      '</div>' +
+      '<div class="report-section" style="margin-top:16px;"><h3><i class="fas fa-envelope-open-text"></i> ' + t('admin_auto_queue') + '</h3>' +
+        (queued ? '<div style="overflow-x:auto;"><table class="report-table"><tr><th>' + t('admin_auto_flow') + '</th><th>' + t('admin_auto_status') + '</th><th>' + t('admin_auto_recipient') + '</th><th>' + t('admin_auto_subject') + '</th><th>' + t('admin_auto_attempts') + '</th><th></th></tr>' + queued + '</table></div>' : '<p style="font-size:11px;color:var(--txt-d);">' + t('admin_auto_no_mail') + '</p>') +
+      '</div>';
+  }).catch(function (err) {
+    cont.innerHTML = '<p style="color:var(--red-g);">' + escapeHtml(err.message) + '</p>';
+  });
+}
+
+function retryAutomationMail(id) {
+  apiSend('POST', 'automatizacion_reintentar', { id: id }).then(function (data) {
+    showToast(data.message || t('admin_auto_retry_ok'), 'success');
+    renderAdminAutomations();
+  }).catch(function (err) {
+    showToast(err.message, 'error');
   });
 }

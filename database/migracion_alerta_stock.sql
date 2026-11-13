@@ -1,9 +1,10 @@
 -- ============================================================
 --  PIXELVAULT - Migracion: alerta de stock bajo
 --  Para bases de datos YA creadas (no borra datos).
---  Ejecutar en phpMyAdmin o: mysql -u root pixelvault < migracion_alerta_stock.sql
+--  LEGACY: para una base existente, usa `php database/migrate_automation.php`.
+--  Conservado como referencia histórica; no lo ejecutes directamente.
 --
---  Que hace (soporta la automatizacion de n8n "Alerta de Stock Bajo"):
+--  Que hace (soporta el flujo nativo de alerta de stock bajo):
 --    producto.alerta_stock_enviada -> 0 = aun no se aviso al admin de que
 --      este producto esta bajo; 1 = ya se aviso (para no repetir el correo
 --      en cada ejecucion).

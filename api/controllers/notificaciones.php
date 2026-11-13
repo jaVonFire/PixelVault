@@ -2,10 +2,8 @@
 /* ============================================================
    Controlador: Notificaciones (recordatorios de carrito)
 
-   Las notificaciones NO se crean aqui: las genera el workflow de
-   n8n "PixelVault - Recordatorio Carrito" (Schedule Trigger cada
-   minuto) que escribe en la tabla `notificacion`. Este controlador
-   solo las LEE para el usuario y marca como leidas.
+   El sondeo del cliente ejecuta las reglas nativas de carrito y reseña,
+   y luego lee la tabla `notificacion` y permite marcar avisos como leidos.
 
    GET  /api/index.php?action=notificaciones        -> lista + no leidas
    POST /api/index.php?action=notificaciones        -> marcar leida (o todas)
@@ -16,6 +14,17 @@
 function notificaciones_index() {
     $u = require_login();
     $uid = (int)$u['id'];
+
+    /* El propio sondeo del navegador procesa los recordatorios del usuario;
+       no requiere que el worker CLI esté abierto para notificar el carrito. */
+    try {
+        require_once __DIR__ . '/../services/scheduled_automations.php';
+        automation_run_reminders($uid);
+        if ($u['rol'] === 'cliente') automation_run_reviews($uid);
+        automation_run_email_queue();
+    } catch (Throwable $e) {
+        error_log('PixelVault notification automation failed: ' . $e->getMessage());
+    }
     $pdo = db();
 
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM notificacion WHERE usuario_id=? AND leida=0');

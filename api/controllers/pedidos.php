@@ -65,9 +65,16 @@ function pedidos_create() {
 
         $pdo->commit();
 
-        /* La factura + fidelidad + cupon + avisos los envia la automatizacion
-           de n8n ("PixelVault - Post-Compra"), que detecta sola este pedido
-           (pedido.facturado_el IS NULL). No se dispara nada desde aqui. */
+        /* Dispara la poscompra y el stock bajo al confirmar la compra.
+           El worker sigue cubriendo reintentos y tareas periódicas. */
+        try {
+            require_once __DIR__ . '/../services/scheduled_automations.php';
+            automation_run_postpurchase();
+            automation_run_low_stock();
+            automation_run_email_queue();
+        } catch (Throwable $automationError) {
+            error_log('PixelVault post-purchase trigger failed: ' . $automationError->getMessage());
+        }
 
         json_ok(array(
             'pedido_id' => $pedido_id,

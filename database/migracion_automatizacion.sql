@@ -1,13 +1,15 @@
 -- ============================================================
 --  PIXELVAULT - Migracion: automatizacion post-compra
 --  Para bases de datos YA creadas (no borra datos).
---  Ejecutar en phpMyAdmin o: mysql -u root pixelvault < migracion_automatizacion.sql
+--  LEGACY: no ejecutes este SQL manualmente. Usa `php database/migrate_automation.php`,
+--  que es idempotente y prepara los campos y tablas para los flujos PHP.
+--  Conservado como referencia histórica; no lo ejecutes directamente.
 --
---  Que hace (soporta la automatizacion de n8n "Post-Compra"):
---   1) pedido.facturado_el   -> marca de tiempo en que n8n proceso el
+--  Que hace (campos usados por la automatizacion PHP de poscompra):
+--   1) pedido.facturado_el   -> marca de tiempo en que PHP proceso el
 --      pedido (envio la factura + fidelidad). Sirve de candado para no
 --      procesar dos veces y de "estado" del flujo.
---   2) pedido.resena_enviada -> 1 cuando n8n ya envio el correo de
+--   2) pedido.resena_enviada -> 1 cuando PHP ya envio el correo de
 --      seguimiento pidiendo resena.
 --   3) usuario.puntos        -> puntos de fidelidad acumulados.
 --   4) usuario.nivel         -> nivel de fidelidad (nuevo/plata/oro/platino).

@@ -3,15 +3,21 @@
    ============================================================ */
 
 function getUserXP() {
-  /* XP igual a la suma de los totales de pedidos del usuario */
+  if (currentUser && currentUser.puntos !== null && currentUser.puntos !== undefined) {
+    return Math.max(0, parseInt(currentUser.puntos, 10) || 0);
+  }
+  /* Compatibilidad visual mientras se carga una base anterior a la migracion. */
   var xp = 0;
   if (currentUser && profileOrders) {
     profileOrders.forEach(function (o) { xp += Number(o.total); });
   }
   return Math.round(xp);
 }
-function xpForLevel(n) { return Math.pow(n - 1, 2) * 100; }
-function userLevel() { var xp = getUserXP(); return Math.floor(Math.sqrt(xp / 100)) + 1; }
+function xpForLevel(n) { return [0, 100, 300, 600][Math.max(0, Math.min(3, n - 1))]; }
+function userLevel() {
+  var xp = getUserXP();
+  return xp >= 600 ? 4 : (xp >= 300 ? 3 : (xp >= 100 ? 2 : 1));
+}
 
 var profileOrders = [];
 var profileOrdersFilter = 'all';
@@ -47,7 +53,8 @@ function renderProfile() {
   var xp = getUserXP();
   var curLvlXp = xpForLevel(lvl);
   var nextLvlXp = xpForLevel(lvl + 1);
-  var pct = Math.min(100, Math.round((xp - curLvlXp) / Math.max(1, (nextLvlXp - curLvlXp)) * 100));
+  var atMaxLevel = lvl >= 4;
+  var pct = atMaxLevel ? 100 : Math.min(100, Math.round((xp - curLvlXp) / Math.max(1, (nextLvlXp - curLvlXp)) * 100));
 
   el.innerHTML =
   '<div class="profile-header">' +
@@ -61,7 +68,7 @@ function renderProfile() {
     '<div class="level-box">' +
       '<div class="lvl-title"><i class="fas fa-bolt"></i> ' + t('profile_level', { n: lvl }) + '</div>' +
       '<div class="xp-bar-track"><div class="xp-bar-fill" style="width:' + pct + '%;"></div></div>' +
-      '<div class="lvl-xp">' + t('profile_xp', { xp: xp, n: (nextLvlXp - xp), lvl: (lvl + 1) }) + '</div>' +
+      '<div class="lvl-xp">' + (atMaxLevel ? t('profile_xp_max', { xp: xp }) : t('profile_xp', { xp: xp, n: (nextLvlXp - xp), lvl: (lvl + 1) })) + '</div>' +
     '</div>' +
   '</div>' +
 

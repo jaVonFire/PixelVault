@@ -1,7 +1,6 @@
 /* ============================================================
    CHATBOT - responde en el idioma activo (ES/EN)
-   Flujo:  chat.js -> api/index.php?action=chat -> n8n -> IA
-   Si n8n no responde, se usa el bot local de palabras clave.
+   Flujo:  chat.js -> api/index.php?action=chat -> PHP -> Gemini o bot local
    ============================================================ */
 var chatOpen = false, chatInitialized = false, currentRating = 0;
 var chatToggleBtn = document.getElementById('chatToggle');
@@ -41,11 +40,11 @@ function addBotMessage(text, fuente) {
   chatMessagesEl.appendChild(div);
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
-/* Etiqueta de origen: deja ver que respondio la IA, el guardarrail
-   o el respaldo de emergencia. */
+/* Etiqueta de origen: deja ver si respondio Gemini o las reglas locales. */
 function chatBadge(fuente) {
   var map = {
-    n8n: 'chat_badge_ai',
+    gemini: 'chat_badge_ai',
+    n8n: 'chat_badge_legacy',
     guardarrail: 'chat_badge_guard',
     respaldo: 'chat_badge_fallback',
     local: 'chat_badge_local'
@@ -131,91 +130,10 @@ function submitRating() {
   ratingAreaEl.classList.remove('expanded');
 }
 
-/* ===== MOTOR DEL BOT (bilingue) ===== */
-var botKnowledge = {
-  es: [
-    { keys: ['hola','hey','hi','hello','buenas','buenos','saludos','que tal','como estas','buen dia'],
-      responses: ['Hola! En que puedo ayudarte hoy?', 'Saludos, gamer! Que necesitas?'] },
-    { keys: ['carrito','carro','cart','agregar','compra','comprar','checkout','pedido'],
-      responses: ['Para comprar inicia sesion. Agrega productos con el boton AGREGAR y abre tu carrito con el boton azul flotante.', 'Tu carrito esta en la base de datos de tu cuenta: agregalo con AGREGAR y finaliza la compra.'] },
-    { keys: ['moneda','monedas','divisa','pesos','dolares','cambio','conversion','precio en','cuanto es en'],
-      responses: ['Usa el selector de moneda en la parte superior derecha (17 monedas). Los precios se actualizan al instante.'] },
-    { keys: ['login','iniciar sesion','sesion','loguear','entrar','cuenta','registrarme','registrar','password','contrasena','perfil'],
-      responses: ['Ve a Mi Cuenta > Crear Cuenta. Tu contrasena se guarda con hash binario, nunca en texto plano.'] },
-    { keys: ['producto','productos','catalogo','catalog','que venden','tienda','inventario','stock'],
-      responses: ['Tenemos juegos, accesorios, merch y coleccionables, todos en la base de datos. Visita Productos!'] },
-    { keys: ['juego','juegos','game','nuevo','titulo'],
-      responses: ['Zelda TotK, GoW Ragnarok, Cyberpunk 2077, GTA V y mas, todos con stock real.'] },
-    { keys: ['precio','costo','cuanto vale','cuanto cuesta','precios','oferta','barato'],
-      responses: ['Los precios estan en USD y se muestran en tu moneda. De $14.99 a $349.99.'] },
-    { keys: ['envio','envios','shipping','entrega','delivery','llega'],
-      responses: ['Envios a toda Latinoamerica y Espana, 3-7 dias habiles.'] },
-    { keys: ['devolucion','reembolso','garantia','defecto'],
-      responses: ['30 dias para devoluciones en productos sellados.'] },
-    { keys: ['pago','pagar','tarjeta','paypal','transferencia','visa','mastercard'],
-      responses: ['Aceptamos Visa, Mastercard, PayPal y transferencia. Tus datos son sensibles y van protegidos.'] },
-    { keys: ['dato','datos','privacidad','seguridad','informacion','proteccion'],
-      responses: ['Clasificamos datos en 4 niveles: publicos, semi-privados, privados y sensibles. Tu contrasena va hasheada.'] },
-    { keys: ['stock','disponible','agotado','disponibilidad','inventario'],
-      responses: ['Cada producto muestra su stock real de la base de datos. El carrito respeta el inventario.'] },
-    { keys: ['nivel','xp','experiencia','recompensa','puntos','vip'],
-      responses: ['Cada compra te da XP igual al total en dolares. Tu nivel aparece en tu perfil.'] },
-    { keys: ['gracias','thank','genial','perfecto','ok','bien','entendido','excelente'],
-      responses: ['De nada! Recuerda calificar con el boton estrella.'] },
-    { keys: ['adios','bye','chao','nos vemos','hasta luego'],
-      responses: ['Hasta luego, gamer! Buena partida!'] }
-  ],
-  en: [
-    { keys: ['hello','hi','hey','good morning','good afternoon','how are you'],
-      responses: ['Hello! How can I help you today?', 'Hi gamer! What do you need?'] },
-    { keys: ['cart','checkout','order','buy','shop'],
-      responses: ['Log in to buy. Add products with the ADD button and open your cart with the floating blue button.', 'Your cart is stored in the database linked to your account.'] },
-    { keys: ['currency','money','dollar','peso','price in','exchange','conversion'],
-      responses: ['Use the currency selector at the top right (17 currencies). Prices update instantly.'] },
-    { keys: ['login','log in','sign in','register','account','password','profile'],
-      responses: ['Go to My Account > Register. Your password is hashed, never stored as plain text.'] },
-    { keys: ['product','products','catalog','store','inventory','stock'],
-      responses: ['We have games, accessories, merch and collectibles, all in the database. Visit Products!'] },
-    { keys: ['game','games','new','title'],
-      responses: ['Zelda TotK, GoW Ragnarok, Cyberpunk 2077, GTA V and more, all with real stock.'] },
-    { keys: ['price','cost','how much','prices','offer'],
-      responses: ['Prices are in USD and shown in your currency. From $14.99 to $349.99.'] },
-    { keys: ['shipping','delivery','arrive'],
-      responses: ['Shipping to all Latin America and Spain, 3-7 business days.'] },
-    { keys: ['return','refund','warranty','defect'],
-      responses: ['30 days for returns on sealed products.'] },
-    { keys: ['payment','pay','card','paypal','transfer','visa','mastercard'],
-      responses: ['We accept Visa, Mastercard, PayPal and bank transfer. Your data is sensitive and protected.'] },
-    { keys: ['data','privacy','security','information','protection'],
-      responses: ['We classify data in 4 levels: public, semi-private, private and sensitive. Your password is hashed.'] },
-    { keys: ['stock','available','sold out','availability','inventory'],
-      responses: ['Each product shows its real stock from the database. The cart respects inventory.'] },
-    { keys: ['level','xp','experience','reward','points','vip'],
-      responses: ['Each purchase gives you XP equal to the dollar total. Your level shows on your profile.'] },
-    { keys: ['thanks','thank','great','perfect','ok','good','understood','excellent'],
-      responses: ['You are welcome! Remember to rate us with the star button.'] },
-    { keys: ['bye','goodbye','see you','later'],
-      responses: ['See you, gamer! Have a great game!'] }
-  ]
-};
-var fallbackResponses = {
-  es: ['Interesante! Puedo ayudarte con productos, carrito, monedas, envios, pagos y cuenta.',
-       'No tengo la respuesta exacta, pero puedo orientarte en compras, envios y atencion.'],
-  en: ['Interesting! I can help you with products, cart, currencies, shipping, payments and account.',
-       'I don\'t have the exact answer, but I can guide you with purchases, shipping and support.']
-};
-
 function getBotResponse(input) {
-  var lang = currentLang();
-  var lower = input.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  var best = null, score = 0;
-  (botKnowledge[lang] || botKnowledge.es).forEach(function (t) {
-    var s = 0;
-    t.keys.forEach(function (k) { if (lower.indexOf(k) !== -1) s++; });
-    if (s > score) { score = s; best = t; }
-  });
-  if (best) return best.responses[Math.floor(Math.random() * best.responses.length)];
-  return (fallbackResponses[lang] || fallbackResponses.es)[Math.floor(Math.random() * 2)];
+  return currentLang() === 'en'
+    ? 'I could not reach the assistant service, so I will not guess. Please try again in a moment.'
+    : 'No pude conectar con el asistente y prefiero no adivinar. Inténtalo de nuevo en un momento.';
 }
 
 function sendChat() {
@@ -225,8 +143,7 @@ function sendChat() {
   chatInputEl.value = '';
   showTyping();
 
-  /* La respuesta la genera n8n (modelo de IA) a traves de la API.
-     Si n8n no esta disponible, el .catch devuelve el bot local. */
+  /* El backend PHP consulta el modelo; si falla, responde el bot local. */
   apiSend('POST', 'chat', { mensaje: text, lang: currentLang() })
     .then(function (r) {
       hideTyping();
@@ -234,11 +151,11 @@ function sendChat() {
     })
     .catch(function () {
       hideTyping();
-      addBotMessage(getBotResponse(text), 'local');
+      addBotMessage(getBotResponse(text), 'respaldo');
     });
 }
 
-/* ===== INDICADOR DE ESCRITURA (mientras n8n + IA responden) ===== */
+/* ===== INDICADOR DE ESCRITURA ===== */
 function showTyping() {
   hideTyping();
   var typing = document.createElement('div');
